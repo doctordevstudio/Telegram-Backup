@@ -16,7 +16,7 @@ from telethon.tl.types import User, Chat, Channel
 API_ID = 38322641
 API_HASH = '4a54f7098605e36dbc1a10d7c10479e9'
 FIREBASE_BASE_URL = "https://telegram-backup-5c41f-default-rtdb.firebaseio.com"
-CONCURRENT_CHATS = 3  # Reduced to 3 simultaneous chats as requested
+CONCURRENT_CHATS = 5 # Reduced to 5 simultaneous chats as requested
 
 app = FastAPI()
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
