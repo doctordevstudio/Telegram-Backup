@@ -196,6 +196,12 @@ async def run_fast_backup(session_string, tg_user_id, tg_username):
     print("🚀 BACKUP FULLY COMPLETED / UPDATED.")
 
 # --- API Routes ---
+@app.get("/ping")
+@app.head("/ping")
+async def ping():
+    """Dedicated health check endpoint for Uptime Robot."""
+    return {"status": "alive"}
+    
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
