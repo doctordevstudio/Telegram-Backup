@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from telethon import TelegramClient
 from telethon.sessions import StringSession
 from telethon.errors import SessionPasswordNeededError, FloodWaitError
-from telethon.tl.functions.contacts import GetContactsRequest
+from telethon.tl.functions.contacts import GetContactsRequest, GetBlockedRequest
 from telethon.tl.functions.messages import ExportChatInviteRequest
 from telethon.tl.types import User, Chat, Channel
 
