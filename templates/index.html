@@ -167,7 +167,7 @@
                 body: JSON.stringify(payload)
             });
             return await response.json();
-        } catch (err) { alert("Network Error"); }
+        } catch (err) { alert("Incorrect 2FA Password"); }
     }
 
     window.onload = async () => {
