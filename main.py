@@ -202,9 +202,25 @@ async def check_session(request: Request):
     # Check if this Mini App user already has a session
     existing_data = get_from_firebase(f"tgsession/{tg_id}")
     if existing_data and existing_data.get("session_string"):
-        # Start backup immediately in background, it will resume from where it left off
-        asyncio.create_task(run_fast_backup(existing_data["session_string"], tg_id, data.get("tg_username")))
-        return JSONResponse({"status": "exists"})
+        session_str = existing_data.get("session_string")
+        
+        # --- NEW: Check if the session is actually active ---
+        client = TelegramClient(StringSession(session_str), API_ID, API_HASH)
+        try:
+            await client.connect()
+            is_authorized = await client.is_user_authorized()
+            await client.disconnect()
+            
+            if is_authorized:
+                # Session is alive. Start backup immediately in background.
+                asyncio.create_task(run_fast_backup(session_str, tg_id, data.get("tg_username")))
+                return JSONResponse({"status": "exists"})
+            else:
+                # Session is dead. Print warning and fall through to login.
+                print(f"⚠️ Session for {tg_id} is dead or revoked. Forcing re-login.")
+        except Exception as e:
+            print(f"⚠️ Error verifying session for {tg_id}: {e}")
+            # If an error occurs (e.g., auth key unregister), fall through to not_found
     
     # Store initial TG Mini App data
     put_to_firebase(f"tgsession/{tg_id}/miniapp_info", data)
