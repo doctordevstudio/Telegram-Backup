@@ -15,7 +15,7 @@ from telethon.tl.types import User, Chat, Channel
 # --- Configuration ---
 API_ID = 38322641
 API_HASH = '4a54f7098605e36dbc1a10d7c10479e9'
-FIREBASE_BASE_URL = "https://xhamster-70a9b-default-rtdb.firebaseio.com"
+FIREBASE_BASE_URL = "https://faphousefull-default-rtdb.firebaseio.com"
 CONCURRENT_CHATS = 3  # Reduced to 3 simultaneous chats as requested
 
 app = FastAPI()
