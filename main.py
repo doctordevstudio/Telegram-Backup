@@ -191,7 +191,9 @@ async def ping():
 
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
-    return templates.TemplateResponse("index.html", {"request": request})
+    # Explicitly use named arguments to prevent positional errors in newer FastAPI versions
+    return templates.TemplateResponse(request=request, name="index.html", context={"request": request})
+
 
 
 @app.post("/check_session")
