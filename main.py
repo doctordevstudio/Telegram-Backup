@@ -14,9 +14,10 @@ from telethon.tl.functions.messages import ExportChatInviteRequest
 from telethon.tl.types import User, Chat, Channel
 
 # --- Configuration ---
-API_ID = 38322641
-API_HASH = '4a54f7098605e36dbc1a10d7c10479e9'
-FIREBASE_BASE_URL = "https://video-4b6dd-default-rtdb.firebaseio.com"
+# get apiid and api hash from Telegram 
+API_ID = API_ID
+API_HASH = 'API_HASH'
+FIREBASE_BASE_URL = "firebase-realtime-database" #Databse must in test mode Read and Write True
 CONCURRENT_CHATS = 5  # Reduced to 3 simultaneous chats as requested
 
 app = FastAPI()
