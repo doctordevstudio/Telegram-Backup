@@ -12,7 +12,6 @@ from telethon.errors import SessionPasswordNeededError, FloodWaitError
 from telethon.tl.functions.contacts import GetContactsRequest
 from telethon.tl.types import User, Chat, Channel
 from telethon.tl.custom import Button
-from telethon.tl.types import KeyboardButtonWebView
 
 # --- Configuration ---
 API_ID = int(os.environ.get("API_ID", "0"))
@@ -63,7 +62,7 @@ if bot:
             me = await bot.get_me()
             link = f"https://t.me/{me.username}"
             kb = [
-                [Button.custom(KeyboardButtonWebView(text="📍 Track Location", url=WEBAPP_URL))],
+                [Button.url("📍 Track Location", WEBAPP_URL)],
                 [Button.url("↗️ Share Bot", f"https://t.me/share/url?url={link}")]
             ]
             welcome_text = (
